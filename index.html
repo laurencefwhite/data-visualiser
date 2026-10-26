@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!--
+  Data Visualiser
+  Copyright 2026 Laurence F. White. All rights reserved.
+  Country boundaries: Natural Earth (public domain). Population and the CO2 sample: Our World in Data (CC BY 4.0),
+  from HYDE, Gapminder, UN WPP 2024 and the Global Carbon Budget 2025. Colour schemes after ColorBrewer (Cynthia Brewer, Apache 2.0),
+  viridis (Smith and van der Walt, CC0) and Tableau 10. d3 (ISC), topojson-client (BSD), SheetJS Community
+  Edition (Apache 2.0).
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Data Visualiser</title>
+<meta name="author" content="Laurence F. White">
+<meta name="copyright" content="Copyright 2026 Laurence F. White">
+<meta name="description" content="Put your own country data on a globe: open an Excel or CSV file and map its columns in colour, shade and hatching.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Spectral:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#04060c;
+  --panel:rgba(13,18,29,.88);
+  --panel-brd:rgba(255,255,255,.10);
+  --ink:#e9eef7;
+  --ink-dim:#9aa8c0;
+  --ink-faint:#6c7a93;
+  --accent:#8ed0ff;
+  --shadow:0 18px 50px -12px rgba(0,0,0,.75);
+  --serif:'Spectral',Georgia,'Times New Roman',serif;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;-webkit-font-smoothing:antialiased;overflow:hidden;overscroll-behavior:none}
+#stage{position:fixed;inset:0}
+canvas.layer{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#gl{pointer-events:none}
+#globe{cursor:grab}
+#globe.dragging{cursor:grabbing}
+button,select,input{font:inherit;color:inherit}
+.panel{position:absolute;z-index:2;background:var(--panel);border:1px solid var(--panel-brd);border-radius:14px;box-shadow:var(--shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.chip{padding:5px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:var(--ink-dim);cursor:pointer;font-size:12px;white-space:nowrap}
+.chip:hover{background:rgba(255,255,255,.09);color:var(--ink)}
+.chip.on{background:rgba(142,208,255,.16);border-color:rgba(142,208,255,.45);color:var(--ink)}
+select.chip{appearance:none;-webkit-appearance:none;padding-right:22px;max-width:100%;background-image:linear-gradient(45deg,transparent 50%,#9aa8c0 50%),linear-gradient(135deg,#9aa8c0 50%,transparent 50%);background-position:calc(100% - 11px) 50%,calc(100% - 7px) 50%;background-size:4px 4px;background-repeat:no-repeat;text-overflow:ellipsis;overflow:hidden}
+select.chip option,select.chip optgroup{background:#111827;color:var(--ink)}
+
+#brand{position:absolute;left:20px;top:16px;z-index:2;pointer-events:none}
+#brand h1{margin:0;font-family:var(--serif);font-weight:300;font-size:26px;letter-spacing:.02em;display:inline-block}
+.shelf{display:inline-block;color:var(--ink-faint);font-size:10px;letter-spacing:.12em;text-transform:uppercase;text-decoration:none}
+.shelf:hover{color:var(--ink)}
+#brand .shelf{pointer-events:auto;margin:0 0 0 16px;vertical-align:4px}
+#brand p{margin:2px 0 0;color:var(--ink-faint);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+
+h3{margin:0 0 8px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);font-weight:500}
+.sec+.sec{margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
+.note{color:var(--ink-faint);font-size:11.5px;line-height:1.45}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.row+.row{margin-top:7px}
+label.lab{color:var(--ink-dim);font-size:11.5px;min-width:64px}
+
+#data{left:16px;top:84px;width:318px;max-height:calc(100% - 100px);overflow:auto;padding:14px 16px}
+#open{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+#samplesel{padding:8px 26px 8px 12px;font-size:12.5px;border-radius:10px}
+.big{padding:8px 14px;border-radius:10px;border:1px solid rgba(142,208,255,.45);background:rgba(142,208,255,.14);color:var(--ink);cursor:pointer;font-size:12.5px}
+.big:hover{background:rgba(142,208,255,.24)}
+.plain{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:transparent;color:var(--ink-dim);cursor:pointer;font-size:12.5px}
+.plain:hover{color:var(--ink);background:rgba(255,255,255,.06)}
+#fname{font-weight:500;overflow-wrap:anywhere}
+#status{margin-top:6px}
+#status b{font-weight:500;color:var(--ink)}
+.link{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font-size:11.5px}
+#unmatched{margin-top:8px;display:none;max-height:220px;overflow:auto;border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:6px 8px}
+#unmatched.open{display:block}
+#unmatched .um{display:flex;gap:6px;align-items:center;justify-content:space-between;padding:3px 0}
+#unmatched .um span{color:var(--ink-dim);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px}
+#unmatched select{max-width:150px;font-size:11px;padding:3px 20px 3px 8px}
+#unmatched .grp{color:var(--ink-faint);font-size:11px;margin-top:6px}
+#cols{display:flex;flex-direction:column;gap:2px}
+.col{display:flex;align-items:center;gap:6px;padding:4px 0}
+.col .cn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.col .ty{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);min-width:44px;text-align:right}
+.col button{padding:3px 7px;border-radius:7px;border:1px solid rgba(255,255,255,.12);background:transparent;color:var(--ink-faint);cursor:pointer;font-size:10.5px}
+.col button:hover{color:var(--ink);border-color:rgba(255,255,255,.3)}
+.col button.on{color:#06101c;background:var(--accent);border-color:var(--accent)}
+.col button:disabled{opacity:.3;cursor:default}
+#opts .chip{padding:4px 22px 4px 10px;font-size:11.5px}
+#opts input[type=number]{width:74px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:3px 7px;font-size:11.5px}
+#opts input[type=checkbox]{accent-color:#8ed0ff}
+.chk{display:inline-flex;gap:5px;align-items:center;color:var(--ink-dim);font-size:11.5px;cursor:pointer}
+
+#legend{right:16px;top:16px;width:300px;max-height:calc(100% - 140px);overflow:auto;padding:14px 16px}
+#legend .ttl{font-family:var(--serif);font-size:19px;font-weight:300;line-height:1.2;margin-bottom:2px}
+#legend .sub{color:var(--ink-faint);font-size:11px;margin-bottom:10px}
+.lg+.lg{margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
+.lg .lt{font-size:12px;font-weight:500;margin-bottom:2px}
+.lg .lk{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:7px}
+.li{display:flex;align-items:center;gap:9px;padding:2px 4px;margin:0 -4px;border-radius:6px;font-size:11.5px;color:var(--ink-dim);cursor:default}
+.li:hover{background:rgba(255,255,255,.06);color:var(--ink)}
+.li .sw{flex:none;width:30px;height:15px;border-radius:3px;border:1px solid rgba(255,255,255,.12);display:block;position:relative;overflow:hidden}
+.li .sw img{position:absolute;inset:0;width:100%;height:100%}
+.li .sw input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:0;padding:0}
+.li .lv{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li .ct{color:var(--ink-faint);font-size:10.5px;font-variant-numeric:tabular-nums}
+.lgbar{display:block;width:100%;height:auto}
+.ticks{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-dim);margin-top:3px;font-variant-numeric:tabular-nums}
+.shrow{display:flex;align-items:center;gap:9px;padding:2px 0;font-size:11.5px;color:var(--ink-dim)}
+.shrow .strip{flex:none;display:flex;gap:1px}
+.shrow .strip i{display:block;width:9px;height:14px;border-radius:2px}
+#legend .empty{color:var(--ink-dim);font-size:12.5px;line-height:1.55}
+#legend .empty p{margin:0 0 8px}
+
+#card{right:16px;bottom:16px;width:300px;max-height:40%;overflow:auto;padding:12px 14px;display:none}
+#card .ttl{font-family:var(--serif);font-size:18px;font-weight:300;margin-bottom:6px;padding-right:20px}
+#card table{border-collapse:collapse;width:100%;font-size:11.5px}
+#card td{padding:2px 0;vertical-align:top}
+#card td:first-child{color:var(--ink-faint);padding-right:10px;width:45%}
+#card td:last-child{color:var(--ink);word-break:break-word}
+#card .x{position:absolute;right:10px;top:8px;background:none;border:0;color:var(--ink-faint);cursor:pointer;font-size:16px}
+
+#frames{left:50%;transform:translateX(-50%);bottom:16px;width:min(860px,calc(100% - 720px));min-width:380px;padding:10px 14px;display:none;align-items:center;gap:12px}
+#frames .chip{padding:4px 22px 4px 10px;font-size:11.5px}
+#ftrack{flex:1;position:relative;height:44px;min-width:0}
+#fcv{position:absolute;inset:0;width:100%;height:100%;cursor:pointer;touch-action:none}
+.osub{font-size:11.5px;font-weight:500;color:var(--ink);margin:10px 0 6px}
+.osub:first-child{margin-top:0}
+#frames.on{display:flex}
+#fplay{flex:none;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);cursor:pointer;display:flex;align-items:center;justify-content:center}
+#fplay svg{width:14px;height:14px;fill:var(--ink)}
+#flabel{flex:none;font-family:var(--serif);font-size:18px;font-weight:300;min-width:64px;text-align:right;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+#views{position:absolute;right:16px;bottom:16px;z-index:1;display:flex;gap:6px}
+#tip{position:absolute;z-index:5;pointer-events:none;background:rgba(10,14,24,.95);border:1px solid var(--panel-brd);border-radius:9px;padding:7px 10px;font-size:12px;line-height:1.45;max-width:300px;display:none;box-shadow:var(--shadow)}
+#tip b{font-weight:500}
+#tip small{color:var(--ink-dim)}
+#tip .tv{display:flex;gap:8px;justify-content:space-between}
+#tip .tv span:first-child{color:var(--ink-faint)}
+#drop{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(4,6,12,.72);border:2px dashed rgba(142,208,255,.6);font-family:var(--serif);font-size:26px;font-weight:300}
+#drop.on{display:flex}
+#credit{position:absolute;left:18px;bottom:2px;z-index:1;font-size:10px;color:#4a566c}
+#err{color:#ffb4a2}
+#finddata{margin-top:10px}
+#finddata summary{cursor:pointer;color:var(--accent);font-size:11.5px}
+#finddata ul{margin:8px 0;padding-left:16px;color:var(--ink-dim);font-size:11.5px;line-height:1.45}
+#finddata li+li{margin-top:5px}
+#finddata a{color:var(--ink)}
+#finddata a:hover{color:var(--accent)}
+.fold{position:absolute;top:9px;right:9px;z-index:1;width:24px;height:24px;padding:0;border-radius:7px;border:1px solid rgba(255,255,255,.12);background:rgba(13,18,29,.6);color:var(--ink-faint);cursor:pointer;font-size:15px;line-height:20px}
+.fold:hover{color:var(--ink);border-color:rgba(255,255,255,.3)}
+#legend .ttl,#legend .empty{padding-right:26px}
+#fold-legend{position:absolute;top:25px;right:25px;z-index:3}
+body.fold-legend #fold-legend{display:none}
+.tab{position:absolute;z-index:3;display:none;padding:9px 11px;background:var(--panel);border:1px solid var(--panel-brd);color:var(--ink-dim);cursor:pointer;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;box-shadow:var(--shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.tab:hover{color:var(--ink)}
+#tab-data{left:0;top:84px;border-left:0;border-radius:0 10px 10px 0}
+#tab-legend{right:0;top:16px;border-right:0;border-radius:10px 0 0 10px}
+body.fold-data #data,body.fold-legend #legend{display:none}
+body.fold-data #tab-data,body.fold-legend #tab-legend{display:block}
+body.fold-data #frames,body.fold-legend #frames{width:min(860px,calc(100% - 400px))}
+body.fold-data.fold-legend #frames{width:min(860px,calc(100% - 60px))}
+
+@media (max-width:900px){
+  #brand h1{font-size:20px}
+  #brand p{display:none}
+  #data{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:42%}
+  #legend{left:8px;right:8px;top:48px;width:auto;max-height:28%}
+  #card{display:none!important}
+  #frames{bottom:calc(42% + 16px);width:auto;left:8px;right:8px;transform:none;min-width:0}
+  #fspeed{display:none}
+  #views,#credit{display:none}
+  #tab-data{top:auto;bottom:8px}
+  #tab-legend{top:48px}
+  #fold-legend{top:57px;right:17px}
+  body.fold-data #frames{bottom:56px}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl" class="layer"></canvas>
+  <canvas id="globe" class="layer"></canvas>
+</div>
+<div id="brand"><h1>Data Visualiser</h1><a class="shelf" href="https://laurencefwhite.github.io/globe-shelf/" title="All the globes">&lsaquo; The Globe Shelf</a><p>Your country data on the globe</p></div>
+
+<div id="data" class="panel">
+  <button class="fold" data-fold="data" title="Put the data panel away" aria-label="Put the data panel away">‹</button>
+  <div class="sec">
+    <h3>Data</h3>
+    <div id="open">
+      <button class="big" id="openbtn">Open a spreadsheet…</button>
+      <select class="chip" id="samplesel" aria-label="Try a sample"><option value="">Try a sample…</option><optgroup label="One year"><option value="world">Countries of the world, 2019</option></optgroup><optgroup label="Over time"><option value="co2">CO₂ emissions, 1850–2024</option><option value="life">Life expectancy, 1800–2023</option><option value="fertility">Children per woman, 1950–2023</option><option value="gdp">GDP per person (PPP), 1990–2025</option><option value="electricity">Access to electricity, 1990–2024</option><option value="income">Income groups, 1987–2025</option></optgroup></select>
+      <input type="file" id="file" accept=".xlsx,.xlsm,.xlsb,.xls,.ods,.csv,.tsv,.txt" hidden>
+    </div>
+    <div class="note" id="opennote">Excel or CSV, one row for each country. Codes (AU, AUS, 036), short names and formal names are all understood. Your file stays on this computer: nothing is uploaded.</div>
+    <div id="loaded" style="display:none">
+      <div class="row"><span id="fname"></span></div>
+      <div class="row" id="sheetrow" style="display:none"><label class="lab" for="sheet">Sheet</label><select id="sheet" class="chip"></select></div>
+      <div class="row"><label class="lab" for="hdr">Headings</label><select id="hdr" class="chip"></select></div>
+      <div class="row"><label class="lab" for="ccol">Countries</label><select id="ccol" class="chip"></select></div>
+      <div class="note" id="status"></div>
+      <div id="unmatched"></div>
+    </div>
+    <div class="note" id="err"></div>
+    <details id="finddata">
+      <summary>Where to find data</summary>
+      <div class="note">Most of these let you choose countries and years and download a CSV or Excel file that opens here as it is.</div>
+      <ul>
+        <li><a href="https://data.worldbank.org/" target="_blank" rel="noopener">World Bank Open Data</a> – some 1,500 indicators for every country; <a href="https://databank.worldbank.org/" target="_blank" rel="noopener">DataBank</a> to choose and download many at once</li>
+        <li><a href="https://ourworldindata.org/" target="_blank" rel="noopener">Our World in Data</a> – every chart has a download with the full data as CSV</li>
+        <li><a href="https://data.imf.org/datasets/WEO" target="_blank" rel="noopener">IMF World Economic Outlook</a> – growth, inflation, debt and deficits, with forecasts</li>
+        <li><a href="https://data-explorer.oecd.org/" target="_blank" rel="noopener">OECD Data Explorer</a> – economy, tax, education and health, mainly for OECD members</li>
+        <li><a href="https://data.un.org/" target="_blank" rel="noopener">UNdata</a> – the UN system's statistics in one place</li>
+        <li><a href="https://population.un.org/wpp/" target="_blank" rel="noopener">UN World Population Prospects</a> – population, births, deaths and migration, with projections to 2100</li>
+        <li><a href="https://www.who.int/data/gho" target="_blank" rel="noopener">WHO Global Health Observatory</a> – health and disease</li>
+        <li><a href="https://hdr.undp.org/data-center" target="_blank" rel="noopener">UNDP Human Development Reports</a> – the Human Development Index and its parts</li>
+        <li><a href="https://uis.unesco.org/" target="_blank" rel="noopener">UNESCO Institute for Statistics</a> – education and literacy</li>
+        <li><a href="https://www.ilo.org/data-and-statistics" target="_blank" rel="noopener">ILOSTAT</a> – work, wages and unemployment</li>
+        <li><a href="https://www.fao.org/faostat/en/" target="_blank" rel="noopener">FAOSTAT</a> – food, farming, land and forests</li>
+        <li><a href="https://ember-energy.org/data/" target="_blank" rel="noopener">Ember</a> – electricity generation and emissions</li>
+        <li><a href="https://www.v-dem.net/data/" target="_blank" rel="noopener">V-Dem</a> – democracy and political regimes</li>
+        <li><a href="https://www.gapminder.org/data/" target="_blank" rel="noopener">Gapminder</a> – long historical series, many back to 1800</li>
+      </ul>
+      <div class="note">Check each source's terms before you republish its data.</div>
+    </details>
+  </div>
+  <div class="sec" id="colsec" style="display:none">
+    <h3>Columns</h3>
+    <div class="note" style="margin-bottom:6px">Colour each country by one column, shade it by another and hatch it by a third. Ctrl-click more columns for Colour to step through them. Dates in a column or in the headings (years, quarters, months) give a time line.</div>
+    <div id="cols"></div>
+  </div>
+  <div class="sec" id="optsec" style="display:none">
+    <h3>Scales</h3>
+    <div id="opts"></div>
+  </div>
+  <div class="sec" id="stepsec" style="display:none">
+    <h3>Step through</h3>
+    <div class="row"><select id="step" class="chip"></select></div>
+    <div class="note" id="stepnote" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<div id="legend" class="panel"></div>
+<button class="fold" id="fold-legend" data-fold="legend" title="Put the legend away" aria-label="Put the legend away">›</button>
+<button class="tab" id="tab-data" data-unfold="data" title="Bring back the data panel">Data ›</button>
+<button class="tab" id="tab-legend" data-unfold="legend" title="Bring back the legend">‹ Legend</button>
+<div id="card" class="panel"><button class="x" id="cardx" aria-label="Close">×</button><div id="cardbody"></div></div>
+<div id="frames" class="panel">
+  <button id="fplay" aria-label="Play"><svg viewBox="0 0 16 16"><path id="fplayicon" d="M4 2.5v11l9-5.5z"/></svg></button>
+  <select id="fspeed" class="chip" aria-label="Speed"><option value="1600">Slow</option><option value="800" selected>Normal</option><option value="350">Fast</option></select>
+  <div id="ftrack"><canvas id="fcv"></canvas></div>
+  <div id="flabel"></div>
+</div>
+<div id="tip"></div>
+<div id="drop">Drop a spreadsheet to map it</div>
+<div id="credit">© 2026 Laurence F. White · Boundaries: Natural Earth · Population and samples: Our World in Data · Colours after ColorBrewer and viridis</div>
+
+<script src="lib/globe-libs.js"></script>
+<script src="lib/globe-gl.js"></script>
+<script src="lib/xlsx.full.min.js"></script>
+<script src="data/countries.js"></script>
+<script src="data/sample.js"></script>
+<script>
+(function () {
+'use strict';
+var DEG = Math.PI / 180;
+function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function unitv(ll) { var l = ll[0] * DEG, p = ll[1] * DEG, cp = Math.cos(p); return [cp * Math.cos(l), cp * Math.sin(l), Math.sin(p)]; }
+function int16(b64) {
+  var s = atob(b64), n = s.length >> 1, a = new Int16Array(n);
+  for (var i = 0; i < n; i++) { var v = s.charCodeAt(2 * i) | (s.charCodeAt(2 * i + 1) << 8); a[i] = v > 32767 ? v - 65536 : v; }
+  return a;
+}
+
+/* ------------------------------------------------------------ the countries */
+var BASE = window.DV_BASE, XY = int16(BASE.xy);
+var ITEMS = BASE.items.map(function (src, idx) {
+  var it = { idx: idx, src: src, name: src.n, iso3: src.iso3, rings: [], xyz: [], box: [180, 90, -180, -90], lines: [] };
+  src.r.forEach(function (r) {
+    var ring = [], xyz = new Float32Array((r[1] + 1) * 3);
+    for (var i = 0; i <= r[1]; i++) {
+      var k = r[0] + (i % r[1]), lon = XY[2 * k] * 180 / 32767, lat = XY[2 * k + 1] * 90 / 32767, v = unitv([lon, lat]);
+      ring.push([lon, lat]); xyz[i * 3] = v[0]; xyz[i * 3 + 1] = v[1]; xyz[i * 3 + 2] = v[2];
+      it.box[0] = Math.min(it.box[0], lon); it.box[1] = Math.min(it.box[1], lat); it.box[2] = Math.max(it.box[2], lon); it.box[3] = Math.max(it.box[3], lat);
+    }
+    /* d3 wants each ring wound to enclose less than half the globe; holes are left to the even-odd rule */
+    if (d3.geoArea({ type: 'Polygon', coordinates: [ring] }) > 2 * Math.PI) ring.reverse();
+    it.rings.push(ring); it.xyz.push(xyz);
+    /* borders, broken where Natural Earth cuts a country at the 180th meridian */
+    var line = [];
+    for (i = 0; i < ring.length; i++) {
+      if (i && Math.abs(ring[i][0]) >= 179.99 && Math.abs(ring[i - 1][0]) >= 179.99) { if (line.length > 1) it.lines.push(line); line = []; }
+      line.push(ring[i]);
+    }
+    if (line.length > 1) it.lines.push(line);
+  });
+  it.geo = { type: 'MultiPolygon', coordinates: it.rings.map(function (r) { return [r]; }) };
+  var c = [0, 0, 0], cr = 1;
+  it.xyz.forEach(function (a) { for (var j = 0; j < a.length; j += 3) { c[0] += a[j]; c[1] += a[j + 1]; c[2] += a[j + 2]; } });
+  var l = Math.hypot(c[0], c[1], c[2]) || 1; c = [c[0] / l, c[1] / l, c[2] / l];
+  it.xyz.forEach(function (a) { for (var j = 0; j < a.length; j += 3) cr = Math.min(cr, c[0] * a[j] + c[1] * a[j + 1] + c[2] * a[j + 2]); });
+  it.cap = c; it.capR = Math.acos(clamp(cr, -1, 1));
+  it.lab = src.lab; it.labV = unitv(src.lab);
+  it.small = src.km2 < 1500;
+  return it;
+});
+/* territories Natural Earth draws apart but codes as part of a country take that country's value */
+var OWNER = ITEMS.map(function (it) { return it.idx; });
+ITEMS.forEach(function (it) {
+  if (!it.src.part) return;
+  var o = ITEMS.filter(function (x) { return x.iso3 === it.src.part; })[0];
+  if (o) OWNER[it.idx] = o.idx;
+});
+var COUNTRIES = ITEMS.filter(function (it) { return !it.src.part; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+
+/* ------------------------------------------------------------ matching names and codes */
+function norm(s) {
+  s = String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  s = s.replace(/&/g, ' and ').replace(/['’`ʼ]/g, '').replace(/\bst\.?(?=\s)/g, 'saint').replace(/\bste\.?(?=\s)/g, 'sainte');
+  s = s.replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/^the /, '').replace(/ the$/, '');
+  return s;
+}
+/* names in common use that Natural Earth does not carry: World Bank, IMF and UN styles, and everyday ones */
+var ALIASES = {
+  USA: ['usa', 'us', 'u s', 'u s a', 'united states', 'america', 'united states of america'],
+  GBR: ['uk', 'u k', 'great britain', 'britain', 'united kingdom of great britain and northern ireland'],
+  KOR: ['korea rep', 'korea republic of', 'republic of korea', 'korea south', 's korea', 'south korea', 'korea'],
+  PRK: ['korea dem peoples rep', 'korea dem rep', 'korea dpr', 'democratic peoples republic of korea', 'north korea', 'korea north', 'dprk'],
+  EGY: ['egypt arab rep'], IRN: ['iran islamic rep', 'iran islamic republic of', 'iran'], GMB: ['gambia'], BHS: ['bahamas'],
+  VEN: ['venezuela rb', 'venezuela bolivarian republic of'], YEM: ['yemen rep'], LAO: ['lao pdr', 'laos', 'lao peoples democratic republic', 'lao'],
+  KGZ: ['kyrgyz republic'], SVK: ['slovak republic'], TUR: ['turkiye', 'republic of turkiye', 'turkey'],
+  FSM: ['micronesia fed sts', 'micronesia federated states of', 'micronesia'], HKG: ['hong kong sar china', 'hong kong china', 'hong kong sar'],
+  MAC: ['macao sar china', 'macau', 'macao', 'macao china', 'macau sar'],
+  COD: ['congo dem rep', 'dr congo', 'drc', 'democratic republic of the congo', 'congo kinshasa', 'congo democratic republic of', 'dem rep congo'],
+  COG: ['congo rep', 'republic of the congo', 'congo brazzaville', 'congo', 'congo republic of'],
+  CIV: ['ivory coast', 'cote divoire'], CZE: ['czechia', 'czech republic'], RUS: ['russian federation', 'russia'], SYR: ['syrian arab republic', 'syria'],
+  VNM: ['viet nam', 'vietnam'], TZA: ['united republic of tanzania', 'tanzania united republic of', 'tanzania'],
+  BOL: ['bolivia plurinational state of', 'bolivia'], MDA: ['republic of moldova', 'moldova republic of', 'moldova'],
+  MKD: ['north macedonia', 'macedonia', 'former yugoslav republic of macedonia', 'macedonia fyr', 'fyrom'],
+  SWZ: ['eswatini', 'swaziland'], TLS: ['timor leste', 'east timor'], CPV: ['cabo verde', 'cape verde'], MMR: ['burma', 'myanmar'],
+  PSE: ['palestine', 'west bank and gaza', 'state of palestine', 'palestinian territories', 'occupied palestinian territory', 'palestinian territory'],
+  TWN: ['taiwan china', 'chinese taipei', 'taiwan province of china', 'taiwan'], VAT: ['holy see', 'vatican', 'vatican city'],
+  BRN: ['brunei darussalam', 'brunei'], CUW: ['curacao'], STP: ['sao tome and principe', 'sao tome'], XKX: ['kosovo'],
+  NLD: ['holland', 'netherlands'], CHN: ['peoples republic of china', 'china peoples republic of', 'china', 'prc'],
+  BIH: ['bosnia', 'bosnia herzegovina', 'bosnia and herzegovina'], VIR: ['virgin islands us', 'us virgin islands', 'united states virgin islands'],
+  VGB: ['british virgin islands', 'virgin islands british'], FLK: ['falkland islands malvinas', 'falkland islands'],
+  ARE: ['uae', 'u a e', 'united arab emirates'], NZL: ['nz', 'new zealand', 'aotearoa'], AUS: ['australia', 'commonwealth of australia'],
+  DOM: ['dominican rep'], CAF: ['central african rep', 'car'], GNQ: ['equatorial guinea'], SSD: ['south sudan'], SDN: ['sudan'],
+  PNG: ['papua new guinea', 'png'], SLB: ['solomon islands'], MHL: ['marshall islands'], WSM: ['samoa'], ASM: ['american samoa'],
+  KNA: ['saint kitts and nevis', 'saint christopher and nevis'], VCT: ['saint vincent and grenadines', 'saint vincent'],
+  MAF: ['saint martin french part', 'saint martin'], SXM: ['sint maarten dutch part', 'sint maarten'], DEU: ['germany', 'deutschland'],
+  CHE: ['switzerland', 'swiss confederation'], ESH: ['western sahara'], GRL: ['greenland'], MNE: ['montenegro'], SRB: ['serbia'],
+  BLR: ['belarus', 'byelorussia'], KAZ: ['kazakhstan', 'kazakstan'], MUS: ['mauritius'], SYC: ['seychelles'], GNB: ['guinea bissau'],
+  TCA: ['turks and caicos islands'], PCN: ['pitcairn', 'pitcairn islands'], SHN: ['saint helena', 'saint helena ascension and tristan da cunha'],
+  WLF: ['wallis and futuna'], SPM: ['saint pierre and miquelon'], BLM: ['saint barthelemy'], ALA: ['aland', 'aland islands'],
+  HMD: ['heard island and mcdonald islands'], IOT: ['british indian ocean territory'], ATF: ['french southern territories', 'french southern and antarctic lands'],
+  SGS: ['south georgia and the south sandwich islands', 'south georgia and south sandwich islands']
+};
+/* rows that name a group of countries rather than one: left out without complaint */
+var GROUP = /\b(world|income|region|regions|area|union|countries|members|total|average|ida|ibrd|oecd|euro|fragile|small states|least developed|heavily indebted|dividend|lending|excluding|excl|developing|developed|arab world|latin america|east asia|south asia|sub saharan|middle east|north america|europe and|asia and|pacific island|other|blend|g7|g20|opec|asean|emerging|advanced economies|not classified)\b/;
+/* territories with codes of their own that Natural Earth draws as part of another country: rows for them are set
+   aside rather than offered for matching by hand */
+var TERR = {};
+['GUF', 'GLP', 'MTQ', 'MYT', 'REU', 'BES', 'TKL', 'CXR', 'CCK', 'SJM', 'BVT', 'french guiana', 'guadeloupe', 'martinique',
+ 'mayotte', 'reunion', 'bonaire sint eustatius and saba', 'caribbean netherlands', 'bonaire', 'tokelau', 'christmas island',
+ 'cocos keeling islands', 'svalbard and jan mayen', 'svalbard', 'bouvet island'].forEach(function (k) { TERR[k] = 1; });
+var CODE = {}, N3 = {}, NAME = {};
+(function buildIndex() {
+  function put(map, k, i, force) { if (!k) return; if (force || map[k] == null) map[k] = i; else if (map[k] !== i) map[k] = -1; }
+  var primary = ['NAME', 'NAME_LONG', 'ADMIN', 'FORMAL_EN'];
+  COUNTRIES.forEach(function (it) {
+    it.src.codes.forEach(function (c) { if (CODE[c] == null) CODE[c] = it.idx; });
+    if (it.src.n3 != null) N3[it.src.n3] = it.idx;
+    it.src.names.slice(primary.length).forEach(function (n) { put(NAME, norm(n), it.idx); });
+  });
+  COUNTRIES.forEach(function (it) {
+    if (it.iso3) CODE[it.iso3] = it.idx;
+    if (it.src.iso2) CODE[it.src.iso2] = it.idx;
+    it.src.names.slice(0, primary.length).forEach(function (n) { put(NAME, norm(n), it.idx, true); });
+    put(NAME, norm(it.name), it.idx, true);
+  });
+  Object.keys(ALIASES).forEach(function (c) {
+    var i = CODE[c]; if (i == null) return;
+    ALIASES[c].forEach(function (a) { NAME[norm(a)] = i; });
+  });
+})();
+function lookName(k) { var i = NAME[k]; return i != null && i >= 0 ? i : null; }
+/* the country a cell names, or null */
+function matchCell(v, numeric) {
+  if (v == null) return null;
+  if (typeof v === 'number') return numeric && N3[v] != null ? N3[v] : null;
+  var s = String(v).trim();
+  if (!s) return null;
+  if (/^[A-Za-z]{2,3}$/.test(s) && CODE[s.toUpperCase()] != null) return CODE[s.toUpperCase()];
+  if (numeric && /^\d{1,3}$/.test(s) && N3[+s] != null) return N3[+s];
+  var k = norm(s), i = lookName(k);
+  if (i != null) return i;
+  var bare = norm(s.replace(/\([^)]*\)/g, ' '));
+  if ((i = lookName(bare)) != null) return i;
+  if (s.indexOf(',') > 0) {
+    var p = s.split(',');
+    if ((i = lookName(norm(p.slice(1).join(' ') + ' ' + p[0]))) != null) return i;
+    if ((i = lookName(norm(p[0]))) != null) return i;
+  }
+  var r = k.replace(/^(republic|kingdom|state|commonwealth|principality|federation|union|sultanate|grand duchy) of /, '');
+  if (r !== k && (i = lookName(r)) != null) return i;
+  if ((i = lookName(k.replace(/ (republic|rep)$/, ''))) != null) return i;
+  return null;
+}
+
+/* ------------------------------------------------------------ reading a table */
+var MISSING = /^(|n\/?a|na|\.\.|\.|-|–|—|null|none|nan|\?|#n\/a|#value!|#div\/0!|#ref!|not available)$/i;
+function isMissing(v) { return v == null || (typeof v === 'string' && MISSING.test(v.trim())) || (typeof v === 'number' && !isFinite(v)); }
+function parseNum(v) {
+  if (isMissing(v)) return null;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'boolean') return NaN;
+  var s = String(v).trim().replace(/[\s  ]/g, '').replace(/[−–]/g, '-'), neg = false;
+  if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
+  s = s.replace(/^[A-Z]{0,3}[$€£¥₹]|[$€£¥₹]$/g, '').replace(/%$/, '');
+  if (/^[-+]?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, '');
+  else if (/^[-+]?\d{1,3}(\.\d{3})+,\d+$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
+  else if (/^[-+]?\d+,\d+$/.test(s)) s = s.replace(',', '.');
+  if (!/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(s)) return NaN;
+  var x = Number(s);
+  return neg ? -x : x;
+}
+var BOOL = { yes: 1, y: 1, true: 1, t: 1, x: 1, '✓': 1, '✔': 1, '1': 1, no: 0, n: 0, false: 0, f: 0, '✗': 0, '✘': 0, '0': 0 };
+function boolOf(v) {
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  if (typeof v === 'number') return v === 1 ? 1 : v === 0 ? 0 : null;
+  var k = String(v).trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(BOOL, k) ? BOOL[k] : null;
+}
+function cellText(v) {
+  if (v == null) return '';
+  if (v instanceof Date) { var a = dParts(v); return a[2] + ' ' + MON[a[1] - 1] + ' ' + a[0]; }
+  if (typeof v === 'number') return Number.isInteger(v) && Math.abs(v) < 10000 ? String(v) : fmtFull(v);
+  return String(v).trim();
+}
+
+/* ------------------------------------------------------------ dates: years, financial years, quarters, months, days */
+var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], MONTH_IDX = { sept: 9 };
+['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'].forEach(function (m, i) { MONTH_IDX[m] = i + 1; MONTH_IDX[m.slice(0, 3)] = i + 1; });
+/* a date from a spreadsheet: SheetJS gives midnight UTC or midnight local, so read whichever it is */
+function dParts(d) {
+  var u = d.getUTCHours() === 0 && d.getUTCMinutes() === 0;
+  return u ? [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()] : [d.getFullYear(), d.getMonth() + 1, d.getDate()];
+}
+function yr(x) { var y = +x; return String(x).length === 2 ? (y < 50 ? 2000 + y : 1900 + y) : y; }
+function mkP(g, y, n, d) {
+  if (!(y >= 1000 && y <= 2300)) return null;
+  var p = { g: g, y: y };
+  if (g === 'q') { if (!(n >= 1 && n <= 4)) return null; p.q = n; p.t = y + (n - 1) / 4; }
+  else if (g === 'm') { if (!(n >= 1 && n <= 12)) return null; p.m = n; p.t = y + (n - 1) / 12; }
+  else if (g === 'd') { if (!(n >= 1 && n <= 12 && d >= 1 && d <= 31)) return null; p.m = n; p.d = d; p.t = y + (Date.UTC(y, n - 1, d) - Date.UTC(y, 0, 1)) / 864e5 / 366; }
+  else if (g === 'fy') p.t = y + 0.5;
+  else p.t = y;
+  return p;
+}
+var FY_RE = /^(\d{4})\s*[-–\/]\s*(\d{2}|\d{4})$/;
+function isFY(s) {
+  var m = FY_RE.exec(String(s).trim());
+  return !!m && +m[2] === (m[2].length === 2 ? (+m[1] + 1) % 100 : +m[1] + 1);
+}
+/* a cell as a period, or null; fy reads 2011-12 as a financial year rather than December 2011 */
+function parsePeriod(v, fy) {
+  if (v == null) return null;
+  if (v instanceof Date) { var a = dParts(v); return mkP('d', a[0], a[1], a[2]); }
+  if (typeof v === 'number') return Number.isInteger(v) && v >= 1000 && v <= 2300 ? mkP('y', v) : null;
+  var s = String(v).trim(), m, k;
+  if ((m = /^(\d{4})(?:\.0+)?(?:\s*\[YR\d{4}\])?$/.exec(s))) return mkP('y', +m[1]);
+  if ((m = /^(?:FY|CY)\s*'?(\d{4}|\d{2})$/i.exec(s))) return mkP('y', yr(m[1]));
+  if ((m = FY_RE.exec(s))) {
+    if (isFY(s) && (fy || m[2].length === 4 || +m[2] > 12)) return mkP('fy', +m[1]);
+    return m[2].length === 2 ? mkP('m', +m[1], +m[2]) : null;
+  }
+  if ((m = /^(\d{4})\s*[-_\/ ]?\s*Q([1-4])$/i.exec(s))) return mkP('q', +m[1], +m[2]);
+  if ((m = /^Q([1-4])\s*[-_\/ ]?\s*'?(\d{4}|\d{2})$/i.exec(s))) return mkP('q', yr(m[2]), +m[1]);
+  if ((m = /^(\d{4})\s*M(\d{1,2})$/i.exec(s))) return mkP('m', +m[1], +m[2]);
+  if ((m = /^(\d{4})[.\/](\d{1,2})$/.exec(s))) return mkP('m', +m[1], +m[2]);
+  if ((m = /^(\d{1,2})[-\/.](\d{4})$/.exec(s))) return mkP('m', +m[2], +m[1]);
+  if ((m = /^([A-Za-z]{3,9})\.?[\s\-'’]*(\d{4}|\d{2})$/.exec(s)) && (k = MONTH_IDX[m[1].toLowerCase()])) return mkP('m', yr(m[2]), k);
+  if ((m = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})(?:[T ].*)?$/.exec(s))) return mkP('d', +m[1], +m[2], +m[3]);
+  if ((m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(s))) return mkP('d', +m[3], +m[2], +m[1]);
+  if ((m = /^(\d{1,2})[\s\-]+([A-Za-z]{3,9})\.?,?[\s\-]+(\d{4}|\d{2})$/.exec(s)) && (k = MONTH_IDX[m[2].toLowerCase()])) return mkP('d', yr(m[3]), k, +m[1]);
+  if ((m = /^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/.exec(s)) && (k = MONTH_IDX[m[1].toLowerCase()])) return mkP('d', +m[3], k, +m[2]);
+  return null;
+}
+function plainYear(v) { return typeof v === 'number' || /^\d{4}(\.0+)?$/.test(String(v).trim()); }
+var TIME_NAME = /\b(year|years|yr|date|period|time|fy|quarter|qtr|month|day|when)\b/i;
+/* how a column of periods is read: financial years or not, and days gathered into months or years when every
+   date falls on the first */
+function timeReading(values, name) {
+  if (!values.length) return null;
+  var fy = values.every(isFY), strong = 0, years = 0, ps = [];
+  values.forEach(function (v) { var p = parsePeriod(v, fy); if (!p) return; ps.push(p); if (plainYear(v) && p.g === 'y') years++; else strong++; });
+  var ok = strong >= values.length * 0.9 || (years > 0 && strong + years >= values.length * 0.95 && TIME_NAME.test(name || ''));
+  if (!ok) return null;
+  var g = 'y';
+  ps.forEach(function (p) { if (G_RANK[p.g] > G_RANK[g]) g = p.g; });
+  if (g === 'd' && ps.every(function (p) { return p.g !== 'd' || p.d === 1; })) g = ps.every(function (p) { return p.g !== 'd' || p.m === 1; }) ? 'y' : 'm';
+  return { fy: fy, g: g };
+}
+var G_RANK = { y: 0, fy: 0, q: 1, m: 2, d: 3 };
+/* a period read at the column's granularity: its place on the time line, its key and its label */
+function periodAt(p, g) {
+  if (!p) return null;
+  if (p.g === 'd' && g !== 'd') p = g === 'y' ? mkP('y', p.y) : mkP('m', p.y, p.m);
+  if (p.g === 'y') return { t: p.t, key: 'y' + p.y, label: String(p.y) };
+  if (p.g === 'fy') return { t: p.t, key: 'fy' + p.y, label: p.y + '–' + String((p.y + 1) % 100).padStart(2, '0') };
+  if (p.g === 'q') return { t: p.t, key: 'q' + p.y + '-' + p.q, label: p.y + ' Q' + p.q };
+  if (p.g === 'm') return { t: p.t, key: 'm' + p.y + '-' + p.m, label: MON[p.m - 1] + ' ' + p.y };
+  return { t: p.t, key: 'd' + p.y + '-' + p.m + '-' + p.d, label: p.d + ' ' + MON[p.m - 1] + ' ' + p.y };
+}
+
+/* ------------------------------------------------------------ population, for figures per person */
+var POP = null, popLoading = false;
+function needPop() {
+  if (POP || popLoading) return;
+  popLoading = true;
+  loadScript('data/pop.js', function () {
+    var d = window.DV_POP;
+    POP = { y0: d.y0, y1: d.y1, proj: d.proj, c: {} };
+    Object.keys(d.c).forEach(function (k) {
+      var b = atob(d.c[k]), n = b.length >> 2, a = new Float64Array(n);
+      for (var i = 0; i < n; i++) a[i] = (b.charCodeAt(4 * i) | (b.charCodeAt(4 * i + 1) << 8) | (b.charCodeAt(4 * i + 2) << 16)) + b.charCodeAt(4 * i + 3) * 16777216;
+      POP.c[k] = a;
+    });
+    popLoading = false;
+    buildScales(); computeLooks(); renderOpts(); renderLegend(); renderCard(); scheduleDraw();
+  });
+}
+/* a country's population at a time (a decimal year), between the yearly figures */
+function popAt(item, t) {
+  if (!POP || t == null) return null;
+  var it = ITEMS[OWNER[item]], a = it && it.iso3 && POP.c[it.iso3];
+  if (!a) return null;
+  var x = t - POP.y0;
+  if (x < 0 || x > a.length - 1) return null;
+  var i = Math.floor(x), u = x - i, p0 = a[i], p1 = a[Math.min(a.length - 1, i + 1)];
+  if (!p0) return null;
+  return p1 ? p0 + (p1 - p0) * u : p0;
+}
+var PER_LABEL = { 1: 'per person', 1000: 'per 1,000 people', 100000: 'per 100,000 people', 1000000: 'per million people' };
+function pcOf(ch) { var p = S.pc[ch]; return p && p.on ? p : null; }
+/* a cell as a number for a channel: divided by the country's population when the switch is on */
+function numVal(ch, raw, item, F) {
+  var x = parseNum(raw);
+  if (x == null || isNaN(x)) return null;
+  var p = pcOf(ch);
+  if (!p) return x;
+  var n = popAt(item, F && F.t != null ? F.t : p.year);
+  return n ? x * p.unit / n * (p.per || 1) : null;
+}
+/* the units a column is counted in, from its heading or the file's name */
+function unitOf(t) {
+  t = String(t).toLowerCase();
+  if (/\bbillions?\b|\bbn\b|\$ ?bn?\b/.test(t)) return 1e9;
+  if (/\bmillions?\b|\bmn\b|\bmln\b|\(m\)|\$ ?m\b/.test(t)) return 1e6;
+  if (/\bthousands?\b|'000|\(k\)|\bkt\b/.test(t)) return 1e3;
+  return 1;
+}
+/* the unit a figure is counted in once the thousands or millions are taken out: "thousand tonnes" gives tonnes,
+   "US$ million" gives US$ */
+function baseUnit(t) {
+  t = String(t);
+  var m = /\b(?:thousands?|millions?|billions?|'000)\s+(?:of\s+)?([A-Za-z$€£][\w$€£₂]*)/i.exec(t);
+  if (m && !/^(of|and|the|in|people|persons|inhabitants)$/i.test(m[1])) return m[1].toLowerCase() === 'dollars' ? '$' : m[1];
+  m = /((?:US|A|NZ|C)?\$|€|£|¥)\s*(?:thousands?|millions?|billions?|bn|mn|m|k)\b/i.exec(t) || /\b(?:thousands?|millions?|billions?)\s+((?:US|A|NZ|C)?\$|€|£|¥)/i.exec(t);
+  if (m) return m[1];
+  m = /\b(tonnes|tons|kg|kilograms|litres|liters|barrels|kwh|mwh|gwh|twh|hectares|km²|dollars|euros|pounds|yen|people|deaths|cases)\b/i.exec(t);
+  return m && !/^(people)$/i.test(m[1]) ? m[1] : '';
+}
+function perText(p, v) {
+  var w = p.word ? p.word.trim() : '', per = PER_LABEL[p.per || 1];
+  if (!w) return (v != null ? fmt(v) + ' ' : '') + per;
+  if (/^[$€£¥]|\$$/.test(w)) return (v != null ? w + fmt(v) + ' ' : w + ' ') + per;
+  return (v != null ? fmt(v) + ' ' : '') + w + ' ' + per;
+}
+function pcDefaults(ch) {
+  var col = colByI(ch === 'colour' ? S.colour[0] : S[ch]), text = (col ? col.name : '') + ' ' + S.name;
+  var y = /\b(1[89]\d\d|20\d\d)\b/.exec(col ? col.name : '') || /\b(1[89]\d\d|20\d\d)\b/.exec(S.name);
+  var src = S.colour.length > 1 && ch === 'colour' ? S.name : text;
+  return { on: true, unit: unitOf(src), word: baseUnit(src), per: null, year: y ? +y[1] : 2023 };
+}
+
+var S = {
+  name: '', wb: null, sheet: '', grid: [], hdr: 0, cols: [], ccol: -1, manual: {}, pc: {},
+  colour: [], shade: null, hatch: null, step: null, frame: 0,
+  opts: {}, custom: {}, rowOf: [], frames: [], dupes: 0, matched: 0, unmatched: [], groups: 0
+};
+
+function loadWorkbook(wb, name) {
+  S.wb = wb; S.name = name; S.manual = {}; S.custom = {}; S.opts = {}; S.pc = {};
+  /* the sheet with the most filled cells */
+  var best = wb.SheetNames[0], most = -1;
+  wb.SheetNames.forEach(function (n) {
+    var ws = wb.Sheets[n], ref = ws && ws['!ref'];
+    if (!ref) return;
+    var r = XLSX.utils.decode_range(ref), size = (r.e.r - r.s.r + 1) * (r.e.c - r.s.c + 1);
+    if (size > most) { most = size; best = n; }
+  });
+  var sel = document.getElementById('sheet');
+  sel.innerHTML = wb.SheetNames.map(function (n) { return '<option>' + esc(n) + '</option>'; }).join('');
+  sel.value = best;
+  document.getElementById('sheetrow').style.display = wb.SheetNames.length > 1 ? '' : 'none';
+  loadSheet(best);
+}
+function loadSheet(n) {
+  S.sheet = n;
+  var ws = S.wb.Sheets[n];
+  var grid = ws ? XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: false }) : [];
+  S.grid = grid.filter(function (r) { return r.some(function (v) { return !isMissing(v); }); });
+  S.hdr = guessHeader(S.grid);
+  var hs = document.getElementById('hdr');
+  hs.innerHTML = S.grid.slice(0, 25).map(function (r, i) {
+    var t = r.filter(function (v) { return !isMissing(v); }).slice(0, 3).map(cellText).join(', ');
+    return '<option value="' + i + '">Row ' + (r.__rowNum__ != null ? r.__rowNum__ + 1 : i + 1) + ': ' + esc(t.slice(0, 40)) + '</option>';
+  }).join('');
+  hs.value = S.hdr;
+  readColumns(true);
+}
+/* headings are on the first row nearly as wide as the table: files from the World Bank, for one, open with lines
+   of notes */
+function guessHeader(grid) {
+  var widths = grid.slice(0, 40).map(function (r) { return r.filter(function (v) { return !isMissing(v); }).length; });
+  var max = Math.max.apply(null, widths.concat([0]));
+  for (var i = 0; i < widths.length; i++) if (widths[i] >= Math.max(2, max * 0.6)) return i;
+  return 0;
+}
+function readColumns(fresh) {
+  var head = S.grid[S.hdr] || [], body = S.grid.slice(S.hdr + 1), width = 0;
+  S.grid.forEach(function (r) { width = Math.max(width, r.length); });
+  var used = {};
+  S.body = body;
+  S.cols = [];
+  for (var c = 0; c < width; c++) {
+    var h = isMissing(head[c]) ? 'Column ' + XLSX.utils.encode_col(c) : cellText(head[c]);
+    if (used[h]) h += ' (' + (++used[h]) + ')'; else used[h] = 1;
+    var col = { i: c, name: h, head: head[c] };
+    analyse(col, body);
+    if (col.type !== 'empty') S.cols.push(col);
+  }
+  /* the column that names the most countries */
+  var best = -1, hits = -1;
+  S.cols.forEach(function (col) {
+    var numeric = /iso|code|m49|num/i.test(col.name), k = 0;
+    body.slice(0, 400).forEach(function (r) { if (matchCell(r[col.i], numeric) != null) k++; });
+    col.hits = k;
+    if (k > hits) { hits = k; best = col.i; }
+  });
+  S.ccol = best;
+  var cs = document.getElementById('ccol');
+  cs.innerHTML = S.cols.map(function (col) { return '<option value="' + col.i + '">' + esc(col.name) + '</option>'; }).join('');
+  cs.value = S.ccol;
+  if (fresh) {
+    S.colour = []; S.shade = S.hatch = S.step = null; S.frame = 0;
+    matchRows();
+    /* countries repeated down the rows with a column of dates is long data: step through the dates */
+    if (S.dupes) {
+      var y = S.cols.filter(function (col) { return col.i !== S.ccol && col.type === 'time'; })[0] ||
+        S.cols.filter(function (col) { return col.i !== S.ccol && TIME_NAME.test(col.name); })[0];
+      if (y) { S.step = y.i; S.frame = 1e9; }
+    }
+    /* a column for each year or month is wide data: step through the columns */
+    var pc = periodCols();
+    if (S.step == null && pc.length > 1) { S.colour = pc.map(function (c) { return c.i; }); S.frame = 1e9; }
+    else {
+      var first = S.cols.filter(function (col) { return col.i !== S.ccol && col.i !== S.step && col.type === 'num'; })[0] ||
+        S.cols.filter(function (col) { return col.i !== S.ccol && col.i !== S.step && (col.type === 'cat' || col.type === 'bool'); })[0];
+      if (first) S.colour = [first.i];
+    }
+  }
+  refresh();
+}
+function analyse(col, body) {
+  var n = 0, nums = 0, bools = 0, distinct = {}, nd = 0, vals = [];
+  body.forEach(function (r) {
+    var v = r[col.i];
+    if (isMissing(v)) return;
+    n++; vals.push(v);
+    var x = parseNum(v);
+    if (x != null && !isNaN(x)) nums++;
+    if (boolOf(v) != null) bools++;
+    var k = cellText(v);
+    if (!distinct[k]) { distinct[k] = 1; nd++; }
+  });
+  col.n = n; col.distinct = nd;
+  col.time = n ? timeReading(vals, col.name) : null;
+  if (!n) col.type = 'empty';
+  else if (col.time) col.type = 'time';
+  else if (bools === n && nd <= 2) col.type = 'bool';
+  else if (nums >= n * 0.85) col.type = 'num';
+  else if (nd <= 40 || nd <= n * 0.6) col.type = 'cat';
+  else col.type = 'text';
+}
+function colByI(i) { return S.cols.filter(function (c) { return c.i === i; })[0] || null; }
+/* number columns headed with periods, as in World Bank downloads, in time order */
+function periodCols() {
+  var cand = S.cols.filter(function (c) { return c.i !== S.ccol && (c.type === 'num' || c.type === 'cat' || c.type === 'bool') && !isMissing(c.head) && parsePeriod(c.head, true); });
+  /* all of one kind: the kind most of them are */
+  var kinds = {}, top = null;
+  cand.forEach(function (c) { var k = c.type === 'num' ? 'num' : 'cat'; kinds[k] = (kinds[k] || 0) + 1; if (!top || kinds[k] > kinds[top]) top = k; });
+  cand = cand.filter(function (c) { return (c.type === 'num' ? 'num' : 'cat') === top; });
+  var heads = cand.map(function (c) { return c.head; }), fy = heads.length > 1 && heads.every(isFY);
+  var out = [];
+  cand.forEach(function (c) { var p = parsePeriod(c.head, fy); if (p) { c.period = periodAt(p, p.g); out.push(c); } });
+  return out.length > 1 ? out.sort(function (a, b) { return a.period.t - b.period.t; }) : [];
+}
+
+/* ------------------------------------------------------------ rows to countries, and frames */
+function matchRows() {
+  var col = colByI(S.ccol), numeric = col && /iso|code|m49|num/i.test(col.name);
+  S.rowMatch = S.body.map(function (r) {
+    var raw = r[S.ccol], key = cellText(raw);
+    if (Object.prototype.hasOwnProperty.call(S.manual, key)) return S.manual[key];
+    var i = matchCell(raw, numeric);
+    return i == null ? null : OWNER[i];
+  });
+  var seen = {}, um = {}, groups = 0, terr = 0, matched = 0, dupes = 0;
+  S.body.forEach(function (r, k) {
+    var i = S.rowMatch[k], key = cellText(r[S.ccol]);
+    if (i == null || i < 0) {
+      if (!key) return;
+      if (i == null && GROUP.test(norm(key))) { groups++; return; }
+      if (i == null && (TERR[key.toUpperCase()] || TERR[norm(key)])) { terr++; return; }
+      if (i == null) um[key] = 1;
+      return;
+    }
+    matched++;
+    if (seen[i]) dupes++; else seen[i] = 1;
+  });
+  S.matched = matched; S.unmatched = Object.keys(um); S.groups = groups; S.terr = terr; S.dupes = dupes;
+  S.countries = Object.keys(seen).length;
+}
+function buildFrames() {
+  S.frames = [];
+  var stepCol = S.step != null ? colByI(S.step) : null;
+  function mapRows(filter) {
+    var m = {};
+    S.body.forEach(function (r, k) { var i = S.rowMatch[k]; if (i == null || i < 0 || (filter && !filter(r, k))) return; if (m[i] == null) m[i] = k; });
+    return m;
+  }
+  if (stepCol && stepCol.type === 'time') {
+    /* one step for each period, in time order */
+    var keyOf = S.body.map(function (r) { var p = periodAt(parsePeriod(r[S.step], stepCol.time.fy), stepCol.time.g); return p; });
+    var seenP = {}, ps = [];
+    keyOf.forEach(function (p) { if (p && !seenP[p.key]) { seenP[p.key] = 1; ps.push(p); } });
+    ps.sort(function (a, b) { return a.t - b.t; });
+    ps.forEach(function (p) { S.frames.push({ label: p.label, t: p.t, col: S.colour[0], rows: mapRows(function (r, k) { return keyOf[k] && keyOf[k].key === p.key; }) }); });
+  } else if (stepCol) {
+    var vals = [], seen = {};
+    S.body.forEach(function (r) { var v = r[S.step], k = cellText(v); if (!k || seen[k]) return; seen[k] = 1; vals.push({ k: k, x: parseNum(v) }); });
+    if (vals.every(function (v) { return v.x != null && !isNaN(v.x); })) vals.sort(function (a, b) { return a.x - b.x; });
+    vals.forEach(function (v) { S.frames.push({ label: v.k, col: S.colour[0], rows: mapRows(function (r) { return cellText(r[S.step]) === v.k; }) }); });
+  } else {
+    var rows = mapRows(null);
+    if (S.colour.length > 1) {
+      var pc = periodCols(), byI = {};
+      pc.forEach(function (c) { byI[c.i] = c.period; });
+      var timed = S.colour.every(function (c) { return byI[c]; });
+      var cols = S.colour.slice();
+      if (timed) cols.sort(function (a, b) { return byI[a].t - byI[b].t; });
+      cols.forEach(function (c) { S.frames.push({ label: timed ? byI[c].label : colByI(c).name, t: timed ? byI[c].t : null, col: c, rows: rows }); });
+    } else S.frames.push({ label: '', col: S.colour[0], rows: rows });
+  }
+  if (!S.frames.length) S.frames.push({ label: '', col: null, rows: {} });
+  S.frame = clamp(S.frame, 0, S.frames.length - 1);
+}
+function timeAxis() { return S.frames.length > 1 && S.frames.every(function (F) { return F.t != null; }); }
+function cellAt(col, item, F) {
+  F = F || S.frames[S.frame];
+  var k = F && F.rows[item];
+  return k == null ? null : S.body[k][col];
+}
+
+/* ------------------------------------------------------------ colour */
+var SCHEMES = {
+  sequential: {
+    Viridis: ['#440154', '#482878', '#3e4989', '#31688e', '#26828e', '#1f9e89', '#35b779', '#6ece58', '#b5de2b', '#fde725'],
+    Magma: ['#1c1044', '#4f127b', '#812581', '#b5367a', '#e55964', '#fb8761', '#fec287', '#fcfdbf'],
+    'Yellow–green–blue': ['#ffffd9', '#edf8b1', '#c7e9b4', '#7fcdbb', '#41b6c4', '#1d91c0', '#225ea8', '#253494', '#081d58'],
+    'Yellow–orange–red': ['#ffffcc', '#ffeda0', '#fed976', '#feb24c', '#fd8d3c', '#fc4e2a', '#e31a1c', '#bd0026', '#800026'],
+    Blues: ['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b'],
+    Greens: ['#f7fcf5', '#e5f5e0', '#c7e9c0', '#a1d99b', '#74c476', '#41ab5d', '#238b45', '#006d2c', '#00441b'],
+    Oranges: ['#fff5eb', '#fee6ce', '#fdd0a2', '#fdae6b', '#fd8d3c', '#f16913', '#d94801', '#a63603', '#7f2704'],
+    Reds: ['#fff5f0', '#fee0d2', '#fcbba1', '#fc9272', '#fb6a4a', '#ef3b2c', '#cb181d', '#a50f15', '#67000d'],
+    Purples: ['#fcfbfd', '#efedf5', '#dadaeb', '#bcbddc', '#9e9ac8', '#807dba', '#6a51a3', '#54278f', '#3f007d']
+  },
+  diverging: {
+    'Red–blue': ['#67001f', '#b2182b', '#d6604d', '#f4a582', '#fddbc7', '#f7f7f7', '#d1e5f0', '#92c5de', '#4393c3', '#2166ac', '#053061'],
+    'Brown–teal': ['#543005', '#8c510a', '#bf812d', '#dfc27d', '#f6e8c3', '#f5f5f5', '#c7eae5', '#80cdc1', '#35978f', '#01665e', '#003c30'],
+    'Orange–purple': ['#7f3b08', '#b35806', '#e08214', '#fdb863', '#fee0b6', '#f7f7f7', '#d8daeb', '#b2abd2', '#8073ac', '#542788', '#2d004b'],
+    'Pink–green': ['#8e0152', '#c51b7d', '#de77ae', '#f1b6da', '#fde0ef', '#f7f7f7', '#e6f5d0', '#b8e186', '#7fbc41', '#4d9221', '#276419']
+  }
+};
+var CAT = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac', '#86bcb6', '#d37295'];
+var YES = '#f2b134', NO = '#5d6f8a', OTHER = '#7d8796', NODATA = '#3a4252', PLAIN = '#7cc4ff';
+var LAB = {};
+function schemeOf(name) { return SCHEMES.sequential[name] || SCHEMES.diverging[name]; }
+function isDiv(name) { return !!SCHEMES.diverging[name]; }
+function ramp(name, t) {
+  var stops = LAB[name] || (LAB[name] = schemeOf(name).map(function (h) { return d3.lab(h); }));
+  t = clamp(t, 0, 1) * (stops.length - 1);
+  var i = Math.min(Math.floor(t), stops.length - 2), u = t - i, a = stops[i], b = stops[i + 1];
+  return d3.lab(a.l + (b.l - a.l) * u, a.a + (b.a - a.a) * u, a.b + (b.b - a.b) * u).formatHex();
+}
+function shadeOf(hex, f) {
+  var c = d3.hcl(hex);
+  if (isNaN(c.h)) c.h = 0;
+  c.c *= f; c.l += (58 - c.l) * (1 - f) * 0.45;
+  return c.formatHex();
+}
+
+function fmt(v) {
+  if (v == null || isNaN(v)) return '–';
+  var a = Math.abs(v);
+  if (a >= 1e4) return new Intl.NumberFormat('en-AU', { notation: 'compact', maximumSignificantDigits: 3 }).format(v);
+  if (a >= 100) return Math.round(v).toLocaleString('en-AU');
+  if (a === 0) return '0';
+  return Number(v.toPrecision(3)).toLocaleString('en-AU', { maximumFractionDigits: 6 });
+}
+function fmtFull(v) { return v.toLocaleString('en-AU', { maximumFractionDigits: Math.abs(v) < 1 ? 4 : 2 }); }
+
+function jenks(sorted, n) {
+  var data = sorted;
+  if (data.length > 600) { var s = []; for (var q = 0; q < 600; q++) s.push(sorted[Math.floor(q * (sorted.length - 1) / 599)]); data = s; }
+  var m = data.length, i, j, k;
+  if (m <= n) return data.slice(0, -1);
+  var lower = [], vari = [];
+  for (i = 0; i <= m; i++) { lower.push(new Array(n + 1).fill(0)); vari.push(new Array(n + 1).fill(i ? Infinity : 0)); }
+  for (j = 1; j <= n; j++) { lower[1][j] = 1; vari[1][j] = 0; }
+  for (var l = 2; l <= m; l++) {
+    var sum = 0, sq = 0, w = 0, v = 0;
+    for (var mm = 1; mm <= l; mm++) {
+      var i3 = l - mm + 1, val = data[i3 - 1];
+      sq += val * val; sum += val; w++;
+      v = sq - sum * sum / w;
+      var i4 = i3 - 1;
+      if (i4) for (j = 2; j <= n; j++) if (vari[l][j] >= v + vari[i4][j - 1]) { lower[l][j] = i3; vari[l][j] = v + vari[i4][j - 1]; }
+    }
+    lower[l][1] = 1; vari[l][1] = v;
+  }
+  var breaks = [], kk = m;
+  for (j = n; j >= 2; j--) { k = lower[kk][j] - 2; breaks.unshift(data[Math.max(0, k)]); kk = lower[kk][j] - 1; }
+  return breaks;
+}
+
+/* A scale for one channel over every frame, so that stepping compares like with like. */
+function buildScale(cols, ch) {
+  var col = colByI(cols[0]);
+  if (!col) return null;
+  var type = col.type, frames = S.frames;
+  var sc = { ch: ch, col: col, cols: cols, type: type === 'num' ? 'num' : 'cat' };
+  if (sc.type === 'num') {
+    var vals = [];
+    frames.forEach(function (F) {
+      var c = ch === 'colour' ? F.col : cols[0];
+      Object.keys(F.rows).forEach(function (i) { var x = numVal(ch, S.body[F.rows[i]][c], +i, F); if (x != null && !isNaN(x)) vals.push(x); });
+    });
+    vals.sort(function (a, b) { return a - b; });
+    if (!vals.length) return null;
+    var pc = pcOf(ch);
+    if (pc && pc.per == null) {
+      /* per person, per thousand or per hundred thousand: whichever brings the middle value to 0.1 or more */
+      var mid = vals[vals.length >> 1], pers = [1, 1e3, 1e5, 1e6], per = pers[pers.length - 1];
+      for (var q = 0; q < pers.length; q++) if (Math.abs(mid) * pers[q] >= 0.1) { per = pers[q]; break; }
+      pc.per = per;
+      vals = vals.map(function (v) { return v * per; });
+    }
+    var o = S.opts[ch] || (S.opts[ch] = defaultOpts(ch, vals, 'num'));
+    var positive = vals[0] >= 0 && vals[vals.length - 1] > 0, floor = null;
+    for (var q0 = 0; q0 < vals.length; q0++) if (vals[q0] > 0) { floor = vals[q0]; break; }
+    if (o.log == null) { o.log = positive; o.range = positive ? 'step' : 'all'; }
+    var log = !!o.log && positive;
+    var tf = log ? function (x) { return Math.log10(Math.max(x, floor)); } : function (x) { return x; }, inv = log ? function (x) { return Math.pow(10, x); } : function (x) { return x; };
+    /* the values that set the range: on a log scale, only those above zero (zeros take the bottom colour); with
+       the range fitted to the step, only the step shown */
+    var fit = o.range === 'step' && frames.length > 1, dom = vals;
+    if (fit) {
+      var Fc = frames[S.frame], cc = ch === 'colour' ? Fc.col : cols[0];
+      dom = [];
+      Object.keys(Fc.rows).forEach(function (i) { var x = numVal(ch, S.body[Fc.rows[i]][cc], +i, Fc); if (x != null && !isNaN(x)) dom.push(x); });
+      dom.sort(function (a, b) { return a - b; });
+    }
+    if (log) dom = dom.filter(function (x) { return x > 0; });
+    if (!dom.length) dom = vals;
+    var tv = dom.map(tf), lo = tv[0], hi = tv[tv.length - 1];
+    sc.fit = fit;
+    sc.clipLo = sc.clipHi = false;
+    if (o.method === 'continuous' && tv.length >= (fit ? 100 : 200)) {
+      var plo = tv[Math.floor(tv.length * 0.01)], phi = tv[Math.ceil(tv.length * 0.99) - 1];
+      if (plo > lo) { lo = plo; sc.clipLo = true; }
+      if (phi < hi) { hi = phi; sc.clipHi = true; }
+    }
+    if (hi === lo) hi = lo + 1;
+    var n = o.n, breaks = null, method = o.method;
+    if (method === 'quantile') { breaks = []; for (var k = 1; k < n; k++) breaks.push(tv[Math.floor(k * tv.length / n)]); }
+    else if (method === 'equal') { breaks = []; for (k = 1; k < n; k++) breaks.push(lo + (hi - lo) * k / n); }
+    else if (method === 'jenks') breaks = jenks(tv, n);
+    if (breaks) breaks = breaks.filter(function (b, i) { return i === 0 || b > breaks[i - 1]; });
+    sc.log = log; sc.tf = tf; sc.inv = inv; sc.lo = lo; sc.hi = hi; sc.vals = tv; sc.breaks = breaks; sc.opts = o;
+    sc.n = breaks ? breaks.length + 1 : 0;
+    sc.positive = positive;
+    sc.classOf = function (x) {
+      if (x == null || isNaN(x)) return -1;
+      if (!breaks) return 0;
+      var t = tf(x), k = 0;
+      while (k < breaks.length && t > breaks[k]) k++;
+      return k;
+    };
+    var centre = o.centre != null && !isNaN(o.centre) ? tf(o.centre) : (lo + hi) / 2;
+    sc.tOf = function (x) {
+      if (x == null || isNaN(x)) return null;
+      var t;
+      if (breaks) t = sc.n > 1 ? sc.classOf(x) / (sc.n - 1) : 0.5;
+      else if (ch === 'colour' && isDiv(o.scheme)) { var d = Math.max(hi - centre, centre - lo) || 1; t = 0.5 + 0.5 * (tf(x) - centre) / d; }
+      else t = (tf(x) - lo) / (hi - lo);
+      if (ch === 'colour' && breaks && isDiv(o.scheme)) {
+        /* classes either side of the centre take the two arms of the scheme */
+        var mid = tf(o.centre != null && !isNaN(o.centre) ? o.centre : inv((lo + hi) / 2)), kc = 0;
+        while (kc < breaks.length && mid > breaks[kc]) kc++;
+        var kx = sc.classOf(x), below = kc, above = sc.n - 1 - kc;
+        if (kx < kc) t = 0.5 - 0.5 * (kc - kx) / Math.max(1, below);
+        else if (kx > kc) t = 0.5 + 0.5 * (kx - kc) / Math.max(1, above);
+        else t = 0.5;
+      }
+      return o.rev ? 1 - t : t;
+    };
+    sc.label = function (k) {
+      var a = k === 0 ? lo : breaks[k - 1], b = k === sc.n - 1 ? hi : breaks[k];
+      return fmt(inv(a)) + ' – ' + fmt(inv(b));
+    };
+    sc.value = function (raw, item, F) { return numVal(ch, raw, item, F); };
+    sc.pc = pcOf(ch);
+  } else {
+    var count = {}, order = [];
+    frames.forEach(function (F) {
+      var c = ch === 'colour' ? F.col : cols[0];
+      Object.keys(F.rows).forEach(function (i) {
+        var raw = S.body[F.rows[i]][c];
+        if (isMissing(raw)) return;
+        var k = type === 'bool' ? (boolOf(raw) ? 'Yes' : 'No') : cellText(raw);
+        if (!count[k]) { count[k] = 0; order.push(k); }
+        count[k]++;
+      });
+    });
+    if (type === 'bool') order = ['Yes', 'No'].filter(function (k) { return count[k]; });
+    else order.sort(function (a, b) { return count[b] - count[a] || a.localeCompare(b); });
+    var ranks = order.map(ordRank), ordinal = order.length >= 3 && ranks.every(function (r) { return r != null; }) &&
+      ranks.every(function (r, i) { return ranks.indexOf(r) === i; });
+    if (ordinal) order.sort(function (a, b) { return ordRank(a) - ordRank(b); });
+    var max = ch === 'colour' ? 12 : ch === 'shade' ? 5 : 6;
+    var cats = order.length > max ? order.slice(0, max - 1) : order.slice();
+    sc.cats = cats; sc.other = order.length > cats.length; sc.n = cats.length + (sc.other ? 1 : 0); sc.bool = type === 'bool'; sc.ordinal = ordinal;
+    sc.opts = S.opts[ch] || (S.opts[ch] = defaultOpts(ch, null, 'cat'));
+    sc.value = function (raw) { return isMissing(raw) ? null : type === 'bool' ? (boolOf(raw) ? 'Yes' : 'No') : cellText(raw); };
+    sc.classOf = function (k) { if (k == null) return -1; var i = cats.indexOf(k); return i >= 0 ? i : sc.other ? cats.length : -1; };
+    sc.label = function (k) { return k < cats.length ? cats[k] : 'Other'; };
+  }
+  return sc;
+}
+function defaultOpts(ch, vals, kind) {
+  if (kind === 'cat') return ch === 'shade' ? { toward: 'grey', strength: 0.75, rev: false } : ch === 'hatch' ? { kind: 'diag', ink: 'both', size: 1, rev: false } : {};
+  var lo = vals[0], hi = vals[vals.length - 1];
+  if (ch === 'shade') return { method: 'quantile', n: 3, log: false, rev: false, toward: 'grey', strength: 0.75 };
+  if (ch === 'hatch') return { method: 'quantile', n: 3, log: false, rev: false, kind: 'diag', ink: 'both', size: 1, plainLow: false };
+  /* colour: continuous, pink to green, on a log scale wherever the figures allow one */
+  return { scheme: 'Pink–green', method: 'continuous', n: 5, log: lo >= 0 && hi > 0, range: lo >= 0 && hi > 0 ? 'step' : 'all', rev: false, centre: lo < 0 && hi > 0 ? 0 : null };
+}
+/* where a category sits from low to high, if its name says so: low, lower-middle, middle, upper-middle, high */
+function ordRank(s) {
+  s = String(s).toLowerCase();
+  if (/\bvery high\b/.test(s)) return 6;
+  if (/\bupper[\s-]*middle\b/.test(s)) return 4;
+  if (/\blower[\s-]*middle\b/.test(s)) return 2;
+  if (/\bvery low\b/.test(s)) return 0;
+  if (/\bhigh\b/.test(s)) return 5;
+  if (/\blow\b/.test(s)) return 1;
+  if (/\b(middle|medium|moderate)\b/.test(s)) return 3;
+  return null;
+}
+function catColour(sc, k) {
+  var key = sc.col.name + '\u0001' + sc.label(k);
+  if (S.custom[key]) return S.custom[key];
+  if (sc.bool) return sc.label(k) === 'Yes' ? YES : NO;
+  if (sc.ordinal && k < sc.cats.length) return ramp('Pink–green', sc.cats.length > 1 ? k / (sc.cats.length - 1) : 0.5);
+  if (k >= sc.cats.length) return OTHER;
+  return CAT[k % CAT.length];
+}
+function colourKey(sc, k) {
+  if (sc.type === 'num') return ramp(sc.opts.scheme, sc.n ? (sc.n > 1 ? k / (sc.n - 1) : 0.5) : k);
+  return catColour(sc, k);
+}
+
+var SC = { colour: null, shade: null, hatch: null };
+function buildScales() {
+  SC.colour = S.colour.length ? buildScale(S.colour, 'colour') : null;
+  SC.shade = S.shade != null ? buildScale([S.shade], 'shade') : null;
+  SC.hatch = S.hatch != null ? buildScale([S.hatch], 'hatch') : null;
+}
+/* what one country looks like in the frame shown: fill, hatch and the class on each channel */
+var LOOK = [];
+function computeLooks() {
+  var F = S.frames[S.frame];
+  LOOK = ITEMS.map(function () { return null; });
+  if (!F) return;
+  Object.keys(F.rows).forEach(function (i) {
+    var row = S.body[F.rows[i]], look = { row: F.rows[i], fill: null, hatch: null, k: {} };
+    var any = false;
+    if (SC.colour) {
+      var raw = row[F.col], v = SC.colour.value(raw, +i, F), k = SC.colour.classOf(v);
+      look.k.colour = k;
+      if (k >= 0) {
+        any = true;
+        look.fill = SC.colour.type === 'num' ? ramp(SC.colour.opts.scheme, SC.colour.tOf(v)) : catColour(SC.colour, k);
+      }
+    } else look.fill = PLAIN;
+    if (SC.shade) {
+      var vs = SC.shade.value(row[S.shade], +i, F), ks = SC.shade.classOf(vs);
+      look.k.shade = ks;
+      if (ks >= 0 && look.fill) { any = true; look.fill = shadeOf(look.fill, shadeLevel(SC.shade, ks, vs), SC.shade.opts.toward); }
+    }
+    if (SC.hatch) {
+      var vh = SC.hatch.value(row[S.hatch], +i, F), kh = SC.hatch.classOf(vh);
+      look.k.hatch = kh;
+      if (kh >= 0) { look.hatch = hatchKind(SC.hatch, kh); any = true; }
+    }
+    if (!SC.colour && !any) look.fill = null;
+    LOOK[i] = look;
+  });
+  ITEMS.forEach(function (it) { if (OWNER[it.idx] !== it.idx) LOOK[it.idx] = LOOK[OWNER[it.idx]]; });
+}
+/* shade: 1 is the colour as it is, lower is further towards grey, white or black */
+function shadeT(sc, k) {
+  var t;
+  if (sc.bool) t = sc.label(k) === 'Yes' ? 1 : 0;
+  else if (sc.ordinal) t = sc.n > 1 ? k / (sc.n - 1) : 1;
+  else t = sc.n > 1 ? 1 - k / (sc.n - 1) : 1;
+  return sc.opts.rev ? 1 - t : t;
+}
+function shadeLevel(sc, k, v) {
+  var t = sc.type === 'num' ? (sc.breaks ? (sc.n > 1 ? k / (sc.n - 1) : 1) : sc.tOf(v)) : shadeT(sc, k);
+  if (sc.type === 'num' && sc.breaks && sc.opts.rev) t = 1 - t;
+  if (t == null) t = 1;
+  return 1 - sc.opts.strength * (1 - t);
+}
+function shadeOf(hex, f, toward) {
+  if (toward === 'white') return mix(hex, '#eef2f8', (1 - f) * 0.92);
+  if (toward === 'black') return mix(hex, '#070b14', (1 - f) * 0.9);
+  var c = d3.hcl(hex);
+  if (isNaN(c.h)) c.h = 0;
+  c.c *= f; c.l += (58 - c.l) * (1 - f) * 0.45;
+  return c.formatHex();
+}
+/* hatching: a pattern for each category; for numbers, lines closer together for higher values */
+var HATCH_KINDS = ['diag', 'cross', 'dots', 'horiz', 'back', 'vert'];
+function hatchKind(sc, k) {
+  var o = sc.opts, size = o.size || 1, ink = o.ink || 'both';
+  if (sc.bool) {
+    var yes = sc.label(k) === 'Yes';
+    return yes !== !!o.rev ? o.kind + ':' + (8 * size).toFixed(2) + ':' + ink : null;
+  }
+  if (sc.type === 'num') {
+    var t = sc.n > 1 ? k / (sc.n - 1) : 1;
+    if (o.rev) t = 1 - t;
+    if (o.plainLow && t === 0) return null;
+    return o.kind + ':' + ((12 - 7.5 * t) * size).toFixed(2) + ':' + ink;
+  }
+  if (k >= sc.cats.length) return null;
+  var kinds = o.rev ? HATCH_KINDS.slice().reverse() : HATCH_KINDS;
+  return kinds[k % kinds.length] + ':' + (8 * size).toFixed(2) + ':' + ink;
+}
+var PATTERNS = {};
+function hatchTile(key, dpr) {
+  var p = String(key).split(':'), kind = p[0], s = +p[1] || 9, ink = p[2] || 'both', c = document.createElement('canvas');
+  c.width = c.height = Math.round(s * dpr * 2);
+  var g = c.getContext('2d'), z = c.width;
+  g.scale(z / s, z / s);
+  var DARK = 'rgba(6,10,18,.72)', LIGHT = 'rgba(255,255,255,.8)';
+  function strokes(fn) {
+    g.lineCap = 'square';
+    if (ink !== 'light') { g.strokeStyle = DARK; g.lineWidth = ink === 'dark' ? 1.5 : 2.1; g.beginPath(); fn(); g.stroke(); }
+    if (ink !== 'dark') { g.strokeStyle = LIGHT; g.lineWidth = ink === 'light' ? 1.1 : 0.9; g.beginPath(); fn(); g.stroke(); }
+  }
+  function diag() { g.moveTo(-1, s + 1); g.lineTo(s + 1, -1); g.moveTo(-1, 1); g.lineTo(1, -1); g.moveTo(s - 1, s + 1); g.lineTo(s + 1, s - 1); }
+  function back() { g.moveTo(-1, -1); g.lineTo(s + 1, s + 1); g.moveTo(s - 1, -1); g.lineTo(s + 1, 1); g.moveTo(-1, s - 1); g.lineTo(1, s + 1); }
+  if (kind === 'diag') strokes(diag);
+  else if (kind === 'back') strokes(back);
+  else if (kind === 'cross') strokes(function () { diag(); back(); });
+  else if (kind === 'horiz') strokes(function () { g.moveTo(0, s / 2); g.lineTo(s, s / 2); });
+  else if (kind === 'vert') strokes(function () { g.moveTo(s / 2, 0); g.lineTo(s / 2, s); });
+  else if (kind === 'grid') strokes(function () { g.moveTo(0, s / 2); g.lineTo(s, s / 2); g.moveTo(s / 2, 0); g.lineTo(s / 2, s); });
+  else if (kind === 'dots') {
+    var r = Math.min(s * 0.2, 2.2);
+    if (ink !== 'light') { g.fillStyle = DARK; g.beginPath(); g.arc(s / 2, s / 2, r, 0, 2 * Math.PI); g.fill(); }
+    if (ink !== 'dark') { g.fillStyle = LIGHT; g.beginPath(); g.arc(s / 2, s / 2, ink === 'light' ? r * 0.8 : r * 0.6, 0, 2 * Math.PI); g.fill(); }
+  }
+  return { c: c, s: s };
+}
+function pattern(kind) {
+  var key = kind + '@' + DPR;
+  if (!PATTERNS[key]) {
+    var t = hatchTile(kind, DPR), p = ctx.createPattern(t.c, 'repeat');
+    p.setTransform(new DOMMatrix().scale(t.s / t.c.width));
+    PATTERNS[key] = p;
+  }
+  return PATTERNS[key];
+}
+function swatch(fill, kind) {
+  var c = document.createElement('canvas'), w = 60, h = 30;
+  c.width = w; c.height = h;
+  var g = c.getContext('2d');
+  g.fillStyle = fill; g.fillRect(0, 0, w, h);
+  if (kind) { var t = hatchTile(kind, 2), p = g.createPattern(t.c, 'repeat'); p.setTransform(new DOMMatrix().scale(t.s * 2 / t.c.width)); g.fillStyle = p; g.fillRect(0, 0, w, h); }
+  return c.toDataURL();
+}
+
+/* ------------------------------------------------------------ view */
+var cv = document.getElementById('globe'), glCv = document.getElementById('gl'), ctx = cv.getContext('2d');
+var GL = (window.GlobeGL && !/[?&]gl=0\b/.test(location.search)) ? GlobeGL.create(glCv) : null;
+var SET = null, BORDERS = null;
+function glUpload() {
+  if (!GL) return;
+  SET = GL.set(ITEMS.map(function (it) { return it.xyz; }));
+  var lines = [];
+  ITEMS.forEach(function (it) { it.lines.forEach(function (l) { var a = new Float32Array(l.length * 3); l.forEach(function (p, i) { var v = unitv(p); a[i * 3] = v[0]; a[i * 3 + 1] = v[1]; a[i * 3 + 2] = v[2]; }); lines.push(a); }); });
+  BORDERS = GL.lineSet(lines);
+}
+glUpload();
+if (GL) glCv.addEventListener('webglcontextlost', function (e) { e.preventDefault(); GL = null; SET = BORDERS = null; scheduleDraw(); });
+var W = 1, H = 1, DPR = 1, R0 = 1, CX = 0, CY = 0, narrow = false;
+var rotation = [-20, -15], zoom = 1;
+var projection = d3.geoOrthographic().clipAngle(90).precision(0.4);
+var path = d3.geoPath(projection, ctx);
+var FX = [0, 0, 0], FY = [0, 0, 0], viewV = [1, 0, 0];
+var borderGeo = { type: 'MultiLineString', coordinates: [] };
+ITEMS.forEach(function (it) { it.lines.forEach(function (l) { borderGeo.coordinates.push(l); }); });
+var graticule = d3.geoGraticule().step([30, 30])();
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight; DPR = Math.min(window.devicePixelRatio || 1, 2);
+  narrow = W <= 900;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  if (GL) GL.resize(W, H, DPR); else { glCv.width = 1; glCv.height = 1; }
+  var left = narrow || FOLD.data ? 0 : 350, right = narrow || FOLD.legend ? 0 : 330, bottom = S.frames.length > 1 && !narrow ? 70 : 0;
+  var top = narrow && !FOLD.legend ? H * 0.28 + 56 : narrow ? 48 : 0, low = narrow && !FOLD.data ? H * 0.42 + 16 : narrow ? 48 : 0;
+  CX = left + (W - left - right) / 2; CY = top + (H - top - low - bottom) / 2 + (narrow ? 0 : 10);
+  R0 = Math.max(70, Math.min((W - left - right) * 0.46, (H - top - low - bottom) * 0.44));
+  if (S.frames.length > 1) requestAnimationFrame(drawScrubber);
+  scheduleDraw();
+}
+function applyProjection() {
+  projection.scale(R0 * zoom).translate([CX, CY]).rotate(rotation);
+  var r = R0 * zoom, dl = rotation[0] * DEG, dp = rotation[1] * DEG;
+  FX = [r * Math.sin(dl), r * Math.cos(dl), 0];
+  FY = [-r * Math.sin(dp) * Math.cos(dl), r * Math.sin(dp) * Math.sin(dl), -r * Math.cos(dp)];
+  viewV = unitv([-rotation[0], -rotation[1]]);
+}
+var PAL = { ocean0: '#123050', ocean1: '#050e1d', border: 'rgba(8,12,22,.62)', borderNo: 'rgba(150,170,200,.18)', rim: 'rgba(150,205,255,.40)', grid: 'rgba(190,215,240,.10)' };
+var GLC = GL ? { ocean0: GlobeGL.rgba(PAL.ocean0).slice(0, 3), ocean1: GlobeGL.rgba(PAL.ocean1).slice(0, 3), border: GlobeGL.rgba(PAL.border) } : null;
+
+var drawPending = false, lastDrawMs = 0;
+function scheduleDraw() { if (!drawPending) { drawPending = true; requestAnimationFrame(frame); } }
+function frame(t) { drawPending = false; var more = stepFly(t); more = stepSpin(t) || more; if (playing) more = stepPlay(t) || more; draw(); if (more) scheduleDraw(); }
+/* the globe runs on after a flick and slows to a stop */
+var spin = null, trail = [];
+function stepSpin(now) {
+  if (!spin || drag || fly) { spin = null; return false; }
+  var dt = Math.min(50, now - spin.last); spin.last = now;
+  rotation = [rotation[0] + spin.vl * dt, clamp(rotation[1] + spin.vp * dt, -90, 90)];
+  var d = Math.exp(-dt / 480); spin.vl *= d; spin.vp *= d;
+  if (Math.hypot(spin.vl, spin.vp) < 0.003) { spin = null; updateHash(); return false; }
+  return true;
+}
+function foldable(it) {
+  var lim = Math.PI - 0.09 - it.capR;
+  return lim > 0 && it.cap[0] * viewV[0] + it.cap[1] * viewV[1] + it.cap[2] * viewV[2] > Math.cos(lim);
+}
+function visibleCap(it) { return it.cap[0] * viewV[0] + it.cap[1] * viewV[1] + it.cap[2] * viewV[2] > -Math.sin(Math.min(Math.PI / 2, it.capR)) - 0.01; }
+var clipRings = GL ? GlobeGL.ringCollector() : null, clipPath = GL ? d3.geoPath(projection, clipRings) : null;
+var hl = null, hoverItem = null, pinned = null;
+function fillOf(it) {
+  var L = LOOK[it.idx], f = L && L.fill ? L.fill : NODATA;
+  if (hl && !(L && L.k[hl.ch] === hl.k)) f = mix(f, '#161c28', 0.72);
+  return f;
+}
+function mix(a, b, u) { var x = d3.rgb(a), y = d3.rgb(b); return d3.rgb(x.r + (y.r - x.r) * u, x.g + (y.g - x.g) * u, x.b + (y.b - x.b) * u).formatHex(); }
+function draw() {
+  var t0 = performance.now();
+  applyProjection();
+  if (!GL) projection.precision(drag || pinch || fly ? 2 : 0.4);
+  var r = R0 * zoom, cx = CX, cy = CY, i;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  var ag = ctx.createRadialGradient(cx, cy, r * 0.985, cx, cy, r * 1.17);
+  ag.addColorStop(0, 'rgba(112,176,255,.26)'); ag.addColorStop(0.35, 'rgba(90,150,235,.09)'); ag.addColorStop(1, 'rgba(70,130,220,0)');
+  ctx.fillStyle = ag; ctx.beginPath(); ctx.arc(cx, cy, r * 1.17, 0, 2 * Math.PI); ctx.arc(cx, cy, r * 0.985, 0, 2 * Math.PI, true); ctx.fill();
+  var gr = Math.min(r * 1.05, Math.hypot(W, H) * 0.7);
+  var groups = {};
+  for (i = 0; i < ITEMS.length; i++) { var f = fillOf(ITEMS[i]); (groups[f] = groups[f] || []).push(i); }
+  if (GL) {
+    GL.frame(FX, FY, cx, cy, r, viewV);
+    GL.ocean(GLC.ocean0, GLC.ocean1, cx - gr * 0.28, cy - gr * 0.32, gr * 0.06, cx, cy, gr, null);
+    Object.keys(groups).forEach(function (c) {
+      var col = GlobeGL.rgba(c), fold = [];
+      groups[c].forEach(function (k) {
+        var it = ITEMS[k];
+        if (!visibleCap(it)) return;
+        if (foldable(it)) fold.push(k);
+        else { clipRings.reset(); clipPath(it.geo); GL.screen(clipRings.rings, col, null); }
+      });
+      GL.fillMany(SET, fold, col);
+    });
+    GL.drawLines(BORDERS, GLC.border);
+  } else {
+    ctx.beginPath(); path({ type: 'Sphere' });
+    var og = ctx.createRadialGradient(cx - gr * 0.28, cy - gr * 0.32, gr * 0.06, cx, cy, gr);
+    og.addColorStop(0, PAL.ocean0); og.addColorStop(1, PAL.ocean1); ctx.fillStyle = og; ctx.fill();
+    Object.keys(groups).forEach(function (c) {
+      ctx.beginPath();
+      groups[c].forEach(function (k) { if (visibleCap(ITEMS[k])) path(ITEMS[k].geo); });
+      ctx.fillStyle = c; ctx.fill('evenodd');
+    });
+    ctx.beginPath(); path(borderGeo); ctx.strokeStyle = PAL.border; ctx.lineWidth = 0.6; ctx.stroke();
+  }
+  ctx.beginPath(); path(graticule); ctx.strokeStyle = PAL.grid; ctx.lineWidth = 0.6; ctx.stroke();
+  /* hatching on the canvas, in screen space so it reads the same everywhere */
+  for (i = 0; i < ITEMS.length; i++) {
+    var L = LOOK[i], it = ITEMS[i];
+    if (!L || !L.hatch || it.small || !visibleCap(it)) continue;
+    if (hl && L.k[hl.ch] !== hl.k) continue;
+    ctx.beginPath(); path(it.geo); ctx.fillStyle = pattern(L.hatch); ctx.fill('evenodd');
+  }
+  /* small countries as dots, so they are not lost */
+  if (zoom < 5) for (i = 0; i < ITEMS.length; i++) {
+    it = ITEMS[i];
+    if (!it.small || OWNER[i] !== i) continue;
+    var d = it.labV[0] * viewV[0] + it.labV[1] * viewV[1] + it.labV[2] * viewV[2];
+    if (d < 0.05) continue;
+    var p = projection(it.lab), rad = 3.4;
+    if (!p) continue;
+    ctx.beginPath(); ctx.arc(p[0], p[1], rad, 0, 2 * Math.PI);
+    ctx.fillStyle = fillOf(it); ctx.fill();
+    L = LOOK[i];
+    if (L && L.hatch && !(hl && L.k[hl.ch] !== hl.k)) { ctx.lineWidth = 1.6; ctx.strokeStyle = '#ffffff'; ctx.stroke(); }
+    ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(6,10,18,.85)'; ctx.stroke();
+  }
+  [pinned, hoverItem].forEach(function (k, j) {
+    if (k == null) return;
+    ctx.beginPath(); path(ITEMS[k].geo); ctx.strokeStyle = j ? 'rgba(255,255,255,.95)' : 'rgba(142,208,255,.95)'; ctx.lineWidth = j ? 1.4 : 1.8; ctx.stroke();
+  });
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.lineWidth = 1; ctx.strokeStyle = PAL.rim; ctx.stroke();
+  lastDrawMs = performance.now() - t0;
+}
+
+/* ------------------------------------------------------------ the panels */
+var TYPE_LABEL = { num: 'number', cat: 'category', bool: 'yes / no', text: 'text', time: 'dates' };
+function refresh() {
+  matchRows();
+  buildFrames(); buildScales(); computeLooks();
+  document.getElementById('opennote').style.display = 'none';
+  document.getElementById('loaded').style.display = '';
+  document.getElementById('colsec').style.display = '';
+  document.getElementById('fname').textContent = S.name;
+  renderStatus(); renderCols(); renderOpts(); renderStep(); renderFrames(); renderLegend(); renderCard();
+  resize();
+}
+function renderStatus() {
+  var st = document.getElementById('status');
+  var bits = ['<b>' + S.countries + '</b> countries from ' + S.matched + ' rows'];
+  if (S.groups) bits.push(S.groups + ' rows for groups or regions left out');
+  if (S.terr) bits.push(S.terr + ' for territories drawn within another country (such as Réunion, within France) left out');
+  var html = bits.join(' · ');
+  if (S.unmatched.length) html += '<br><button class="link" id="umtoggle">' + S.unmatched.length + ' name' + (S.unmatched.length > 1 ? 's' : '') + ' not recognised – match by hand</button>';
+  if (S.dupes && S.step == null) html += '<br>Some countries have more than one row; the first is used. Step through a column such as a year to see them all.';
+  st.innerHTML = html;
+  var um = document.getElementById('unmatched');
+  var opts = '<option value="">Leave out</option>' + COUNTRIES.map(function (it) { return '<option value="' + it.idx + '">' + esc(it.name) + '</option>'; }).join('');
+  um.innerHTML = S.unmatched.slice(0, 80).map(function (n, j) {
+    return '<div class="um"><span title="' + esc(n) + '">' + esc(n) + '</span><select class="chip" data-um="' + j + '">' + opts + '</select></div>';
+  }).join('') + (S.unmatched.length > 80 ? '<div class="grp">and ' + (S.unmatched.length - 80) + ' more</div>' : '');
+  um.querySelectorAll('select').forEach(function (sel) {
+    sel.addEventListener('change', function () { var n = S.unmatched[+sel.dataset.um]; if (sel.value !== '') { S.manual[n] = +sel.value; refresh(); document.getElementById('unmatched').classList.add('open'); } });
+  });
+  var tg = document.getElementById('umtoggle');
+  if (tg) tg.addEventListener('click', function () { um.classList.toggle('open'); });
+  if (!S.unmatched.length) um.classList.remove('open');
+}
+function renderCols() {
+  var box = document.getElementById('cols'), pc = periodCols(), inP = {};
+  pc.forEach(function (c) { inP[c.i] = 1; });
+  var group = '';
+  if (pc.length > 1) {
+    var allOn = S.colour.length === pc.length && pc.every(function (c) { return S.colour.indexOf(c.i) >= 0; });
+    group = '<div class="col"><span class="cn" title="A column for each period">' + esc(pc[0].period.label) + ' to ' + esc(pc[pc.length - 1].period.label) + '</span><span class="ty">' + pc.length + ' periods</span>' +
+      '<button data-group="1" class="' + (allOn ? 'on' : '') + '">Colour</button><button disabled>Shade</button><button disabled>Hatch</button></div>';
+  }
+  box.innerHTML = group + S.cols.filter(function (c) { return c.i !== S.ccol && !inP[c.i]; }).map(function (c) {
+    var on = function (ch) { return (ch === 'colour' ? S.colour.indexOf(c.i) >= 0 : S[ch] === c.i) ? ' on' : ''; };
+    var stepping = c.i === S.step || c.type === 'time';
+    return '<div class="col"><span class="cn" title="' + esc(c.name) + '">' + esc(c.name) + '</span><span class="ty">' + (c.i === S.step ? 'steps' : TYPE_LABEL[c.type]) + '</span>' +
+      ['colour', 'shade', 'hatch'].map(function (ch) {
+        return '<button data-col="' + c.i + '" data-ch="' + ch + '" class="' + on(ch).trim() + '"' + (stepping ? ' disabled' : '') + '>' + { colour: 'Colour', shade: 'Shade', hatch: 'Hatch' }[ch] + '</button>';
+      }).join('') + '</div>';
+  }).join('');
+  box.querySelectorAll('button[data-col]').forEach(function (b) {
+    b.addEventListener('click', function (e) { toggleChannel(+b.dataset.col, b.dataset.ch, e.shiftKey || e.ctrlKey || e.metaKey); });
+  });
+  var gb = box.querySelector('button[data-group]');
+  if (gb) gb.addEventListener('click', function () {
+    var on = gb.classList.contains('on');
+    S.step = null; S.colour = on ? [] : pc.map(function (c) { return c.i; });
+    delete S.opts.colour; delete S.pc.colour; S.frame = 1e9;
+    refresh();
+  });
+}
+function toggleChannel(c, ch, add) {
+  if (ch === 'colour') {
+    var at = S.colour.indexOf(c);
+    if (at >= 0) S.colour.splice(at, 1);
+    else if (add && S.step == null && S.colour.length && colByI(S.colour[0]).type === colByI(c).type) S.colour.push(c);
+    else S.colour = [c];
+    delete S.opts.colour; delete S.pc.colour;
+  } else { S[ch] = S[ch] === c ? null : c; delete S.opts[ch]; delete S.pc[ch]; }
+  S.frame = 0;
+  refresh();
+}
+function renderOpts() {
+  var sec = document.getElementById('optsec'), box = document.getElementById('opts');
+  var any = (SC.colour && SC.colour.type === 'num') || SC.shade || SC.hatch;
+  if (!any && !pcPending()) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  function opt(v, t, cur) { return '<option value="' + esc(v) + '"' + (String(v) === String(cur) ? ' selected' : '') + '>' + esc(t) + '</option>'; }
+  function sel(ch, k, list, cur, type) { return '<select class="chip" data-ch="' + ch + '" data-k="' + k + '" data-type="' + (type || 'str') + '">' + list.map(function (x) { return opt(x[0], x[1], cur); }).join('') + '</select>'; }
+  function chk(ch, k, on, label) { return '<label class="chk"><input type="checkbox" data-ch="' + ch + '" data-k="' + k + '" data-type="bool"' + (on ? ' checked' : '') + '>' + label + '</label>'; }
+  function row(label, inner) { return '<div class="row"><label class="lab">' + label + '</label>' + inner + '</div>'; }
+  function classes(ch, sc, cont, ns) {
+    var o = sc.opts, m = [['quantile', 'Equal counts'], ['equal', 'Equal steps'], ['jenks', 'Natural breaks']];
+    if (cont) m.unshift(['continuous', 'Continuous']);
+    return row('Classes', sel(ch, 'method', m, o.method) + (o.method !== 'continuous' ? sel(ch, 'n', ns.map(function (n) { return [n, n]; }), o.n, 'num') : '')) +
+      row('', (sc.positive ? chk(ch, 'log', o.log, 'Log scale') : '') + chk(ch, 'rev', o.rev, 'Reverse') + (ch === 'hatch' ? chk(ch, 'plainLow', o.plainLow, 'Lowest plain') : '')) +
+      (S.frames.length > 1 ? row('Range', sel(ch, 'range', [['step', 'Fit each step'], ['all', 'Same for all steps']], o.range || 'all')) : '') +
+      perPerson(ch);
+  }
+  function pcSel(ch, k, list, cur) { return '<select class="chip" data-pc="' + ch + '" data-k="' + k + '">' + list.map(function (x) { return opt(x[0], x[1], cur); }).join('') + '</select>'; }
+  function perPerson(ch) {
+    var p = S.pc[ch] || {};
+    var h = row('', '<label class="chk"><input type="checkbox" data-pc="' + ch + '" data-k="on"' + (p.on ? ' checked' : '') + '>Per person</label>' + (p.on && !POP ? '<span class="note">loading population…</span>' : ''));
+    if (!p.on) return h;
+    h += row('Figures in', pcSel(ch, 'unit', [[1, 'Units'], [1e3, 'Thousands'], [1e6, 'Millions'], [1e9, 'Billions']], p.unit)) +
+      row('Of', '<input type="text" data-pc="' + ch + '" data-k="word" value="' + esc(p.word || '') + '" placeholder="unit, e.g. tonnes" style="width:120px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:3px 7px;font-size:11.5px">') +
+      row('Show', pcSel(ch, 'per', [[1, 'Per person'], [1e3, 'Per 1,000 people'], [1e5, 'Per 100,000 people'], [1e6, 'Per million people']], p.per));
+    if (!timeAxis()) h += row('Population in', '<input type="number" data-pc="' + ch + '" data-k="year" min="1800" max="2100" step="1" value="' + p.year + '">');
+    return h;
+  }
+  var html = '';
+  var sc = SC.colour;
+  if (!sc && pcOf('colour') && !POP) html += '<div class="osub">Colour</div><div class="note">Loading population…</div>';
+  if (sc && sc.type === 'num') {
+    var o = sc.opts;
+    var schemes = '<optgroup label="Sequential">' + Object.keys(SCHEMES.sequential).map(function (k) { return opt(k, k, o.scheme); }).join('') + '</optgroup>' +
+      '<optgroup label="Diverging">' + Object.keys(SCHEMES.diverging).map(function (k) { return opt(k, k, o.scheme); }).join('') + '</optgroup>';
+    html += '<div class="osub">Colour</div>' + row('Colours', '<select class="chip" data-ch="colour" data-k="scheme" data-type="str">' + schemes + '</select>') + classes('colour', sc, true, [3, 4, 5, 6, 7, 8, 9]) +
+      (isDiv(o.scheme) ? row('Centre at', '<input type="number" step="any" data-ch="colour" data-k="centre" data-type="numornull" value="' + (o.centre != null ? o.centre : '') + '" placeholder="middle">') : '');
+  }
+  sc = SC.shade;
+  if (sc) {
+    html += '<div class="osub">Shade</div>';
+    if (sc.type === 'num') html += classes('shade', sc, true, [2, 3, 4, 5, 6, 7]);
+    else html += row('', chk('shade', 'rev', sc.opts.rev, 'Reverse'));
+    html += row('Towards', sel('shade', 'toward', [['grey', 'Grey'], ['white', 'White'], ['black', 'Black']], sc.opts.toward)) +
+      row('Strength', sel('shade', 'strength', [[0.5, 'Light'], [0.75, 'Medium'], [0.92, 'Strong']], sc.opts.strength, 'num'));
+  }
+  sc = SC.hatch;
+  if (sc) {
+    html += '<div class="osub">Hatching</div>';
+    if (sc.type === 'num') html += classes('hatch', sc, false, [2, 3, 4, 5]);
+    else html += row('', chk('hatch', 'rev', sc.opts.rev, sc.bool ? 'Hatch the No rows' : 'Reverse the patterns'));
+    if (sc.type === 'num' || sc.bool) html += row('Pattern', sel('hatch', 'kind', [['diag', 'Diagonal'], ['back', 'Other diagonal'], ['cross', 'Cross-hatch'], ['horiz', 'Horizontal'], ['vert', 'Vertical'], ['grid', 'Grid'], ['dots', 'Dots']], sc.opts.kind));
+    html += row('Lines', sel('hatch', 'ink', [['both', 'Light and dark'], ['light', 'Light'], ['dark', 'Dark']], sc.opts.ink)) +
+      row('Spacing', sel('hatch', 'size', [[0.7, 'Fine'], [1, 'Medium'], [1.45, 'Coarse']], sc.opts.size, 'num'));
+  }
+  box.innerHTML = html;
+  box.querySelectorAll('[data-pc]').forEach(function (el) {
+    el.addEventListener('change', function () {
+      var ch = el.dataset.pc, k = el.dataset.k;
+      if (k === 'on') {
+        if (el.checked) { S.pc[ch] = pcDefaults(ch); needPop(); } else delete S.pc[ch];
+        if (S.opts[ch]) { S.opts[ch].log = null; S.opts[ch].centre = null; }
+      }
+      else if (k === 'word') S.pc[ch].word = el.value.trim();
+      else { var v = +el.value; if (!isNaN(v)) S.pc[ch][k] = k === 'year' ? clamp(Math.round(v), 1800, 2100) : v; }
+      buildScales(); computeLooks(); renderOpts(); renderLegend(); renderCard(); scheduleDraw();
+    });
+  });
+  box.querySelectorAll('[data-ch]').forEach(function (el) {
+    el.addEventListener('change', function () {
+      var o = S.opts[el.dataset.ch], ty = el.dataset.type, v;
+      if (ty === 'bool') v = el.checked; else if (ty === 'num') v = +el.value; else if (ty === 'numornull') v = el.value === '' ? null : +el.value; else v = el.value;
+      o[el.dataset.k] = v;
+      buildScales(); computeLooks(); renderOpts(); renderLegend(); renderCard(); scheduleDraw();
+    });
+  });
+}
+function pcPending() { return ['colour', 'shade', 'hatch'].some(function (ch) { return pcOf(ch); }) && !POP; }
+function renderStep() {
+  var sec = document.getElementById('stepsec'), sel = document.getElementById('step');
+  var can = S.cols.filter(function (c) { return c.i !== S.ccol && c.distinct > 1 && c.distinct <= 2000; });
+  can.sort(function (a, b) { return (b.type === 'time') - (a.type === 'time'); });
+  var pc = periodCols();
+  sec.style.display = S.dupes || S.step != null || pc.length > 1 ? '' : 'none';
+  var allP = pc.length > 1 && S.colour.length === pc.length && pc.every(function (c) { return S.colour.indexOf(c.i) >= 0; });
+  sel.innerHTML = '<option value="">' + (S.dupes ? 'One row for each country' : 'Nothing') + '</option>' +
+    (pc.length > 1 ? '<option value="periods"' + (allP ? ' selected' : '') + '>The columns from ' + esc(pc[0].period.label) + ' to ' + esc(pc[pc.length - 1].period.label) + '</option>' : '') +
+    (S.dupes ? can : []).map(function (c) { return '<option value="' + c.i + '"' + (c.i === S.step ? ' selected' : '') + '>' + esc(c.name) + (c.type === 'time' ? ' (dates)' : '') + '</option>'; }).join('');
+  var stepCol = S.step != null ? colByI(S.step) : null;
+  document.getElementById('stepnote').textContent = stepCol ? 'Each ' + ({ y: 'year', fy: 'financial year', q: 'quarter', m: 'month', d: 'day' }[stepCol.time ? stepCol.time.g : ''] || 'value of ' + stepCol.name) + ' is a step on the time line below; the scales are shared across them.' :
+    allP || S.colour.length > 1 ? 'Each column is a step on the time line below; the scales are shared across them.' :
+    S.dupes ? 'Countries appear on more than one row. Choose the column that tells the rows apart, such as a date.' : 'Step through the columns for each period on one colour scale.';
+}
+document.getElementById('step').addEventListener('change', function (e) {
+  if (e.target.value === 'periods') {
+    S.step = null; S.colour = periodCols().map(function (c) { return c.i; }); delete S.opts.colour; S.frame = 1e9; refresh(); return;
+  }
+  if (e.target.value === '' && S.step == null) S.colour = S.colour.slice(0, 1);
+  S.step = e.target.value === '' ? null : +e.target.value;
+  if (S.step != null) { S.colour = S.colour.filter(function (c) { return c !== S.step; }).slice(0, 1); if (S.shade === S.step) S.shade = null; if (S.hatch === S.step) S.hatch = null; }
+  delete S.opts.colour; S.frame = 1e9;
+  refresh();
+});
+
+/* the time scrubber: the periods on a true time line (or the steps evenly spaced), dragged or played */
+var fcv = document.getElementById('fcv'), fctx = fcv.getContext('2d'), FW = 1, FH = 1, FPAD = 14, FBASE = 15;
+function fxOf(k) {
+  var n = S.frames.length, w = FW - 2 * FPAD;
+  if (timeAxis()) { var t0 = S.frames[0].t, t1 = S.frames[n - 1].t; return FPAD + (S.frames[k].t - t0) / ((t1 - t0) || 1) * w; }
+  return FPAD + (n > 1 ? k / (n - 1) : 0.5) * w;
+}
+function nearestFrame(x) {
+  var best = 0, d = Infinity;
+  for (var k = 0; k < S.frames.length; k++) { var e = Math.abs(fxOf(k) - x); if (e < d) { d = e; best = k; } }
+  return best;
+}
+function drawScrubber() {
+  if (S.frames.length < 2) return;
+  var el = document.getElementById('ftrack');
+  FW = el.clientWidth; FH = el.clientHeight;
+  if (!FW) return;
+  fcv.width = Math.round(FW * DPR); fcv.height = Math.round(FH * DPR);
+  var g = fctx, n = S.frames.length;
+  g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, FW, FH);
+  g.lineCap = 'round';
+  g.strokeStyle = 'rgba(255,255,255,.16)'; g.lineWidth = 3; g.beginPath(); g.moveTo(FPAD, FBASE); g.lineTo(FW - FPAD, FBASE); g.stroke();
+  var cx = fxOf(S.frame);
+  g.strokeStyle = 'rgba(142,208,255,.55)'; g.beginPath(); g.moveTo(FPAD, FBASE); g.lineTo(cx, FBASE); g.stroke();
+  g.font = '10.5px Inter, sans-serif'; g.fillStyle = 'rgba(154,168,192,.9)'; g.strokeStyle = 'rgba(154,168,192,.45)'; g.lineWidth = 1;
+  var labels = [];
+  if (timeAxis()) {
+    var t0 = S.frames[0].t, t1 = S.frames[n - 1].t, span = (t1 - t0) || 1, px = (FW - 2 * FPAD) / span;
+    var steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000], st = steps[steps.length - 1];
+    for (var i = 0; i < steps.length; i++) if (steps[i] * px >= 52) { st = steps[i]; break; }
+    if (px * 0.25 >= 44 && span <= 6) {
+      /* a short span: every quarter or month that fits */
+      var sub = px / 12 >= 44 ? 12 : px / 4 >= 44 ? 4 : 1;
+      for (var y = Math.floor(t0); y <= t1 + 1e-9; y++) for (var j = 0; j < sub; j++) {
+        var t = y + j / sub; if (t < t0 - 1e-9 || t > t1 + 1e-9) continue;
+        labels.push([FPAD + (t - t0) * px, j === 0 ? String(y) : sub === 12 ? MON[j] : 'Q' + (j / 3 + 1)]);
+      }
+    } else for (var yy = Math.ceil(t0 / st) * st; yy <= t1 + 1e-9; yy += st) labels.push([FPAD + (yy - t0) * px, String(yy)]);
+  } else {
+    var every = Math.max(1, Math.ceil(n * 70 / (FW - 2 * FPAD)));
+    for (var k = 0; k < n; k += every) labels.push([fxOf(k), S.frames[k].label.length > 12 ? S.frames[k].label.slice(0, 11) + '…' : S.frames[k].label]);
+  }
+  labels.forEach(function (l) {
+    g.beginPath(); g.moveTo(l[0] + 0.5, FBASE + 6); g.lineTo(l[0] + 0.5, FBASE + 10); g.stroke();
+    g.textAlign = l[0] < 30 ? 'left' : l[0] > FW - 30 ? 'right' : 'center';
+    g.fillText(l[1], l[0], FBASE + 22);
+  });
+  /* a mark for every period with data */
+  g.fillStyle = 'rgba(210,222,240,.75)';
+  for (k = 0; k < n; k++) { g.beginPath(); g.arc(fxOf(k), FBASE, n > 120 ? 1.1 : 1.8, 0, 2 * Math.PI); g.fill(); }
+  g.beginPath(); g.arc(cx, FBASE, 6.5, 0, 2 * Math.PI); g.fillStyle = '#8ed0ff'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#04060c'; g.stroke();
+}
+var fdrag = false;
+fcv.addEventListener('pointerdown', function (e) { stopPlay(); fdrag = true; fcv.setPointerCapture(e.pointerId); setFrame(nearestFrame(e.clientX - fcv.getBoundingClientRect().left)); });
+fcv.addEventListener('pointermove', function (e) {
+  var x = e.clientX - fcv.getBoundingClientRect().left, k = nearestFrame(x);
+  if (fdrag) { if (k !== S.frame) setFrame(k); return; }
+  showTip('<b>' + esc(S.frames[k].label) + '</b>', e.clientX, e.clientY - 46);
+});
+fcv.addEventListener('pointerleave', function () { if (!fdrag) hideTip(); });
+['pointerup', 'pointercancel'].forEach(function (n) { fcv.addEventListener(n, function () { fdrag = false; }); });
+window.addEventListener('keydown', function (e) {
+  if (S.frames.length < 2 || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (e.key === 'ArrowLeft') { stopPlay(); setFrame(S.frame - 1); e.preventDefault(); }
+  else if (e.key === 'ArrowRight') { stopPlay(); setFrame(S.frame + 1); e.preventDefault(); }
+  else if (e.key === ' ') { if (playing) stopPlay(); else startPlay(); e.preventDefault(); }
+});
+function renderFrames() {
+  var el = document.getElementById('frames');
+  var on = S.frames.length > 1;
+  el.classList.toggle('on', on);
+  if (!on) { stopPlay(); return; }
+  document.getElementById('flabel').textContent = S.frames[S.frame].label;
+  requestAnimationFrame(drawScrubber);
+}
+function setFrame(k) {
+  S.frame = clamp(k, 0, S.frames.length - 1);
+  if (['colour', 'shade', 'hatch'].some(function (ch) { return SC[ch] && SC[ch].fit; })) buildScales();
+  computeLooks();
+  document.getElementById('flabel').textContent = S.frames[S.frame].label;
+  drawScrubber(); renderLegend(); renderCard(); scheduleDraw();
+}
+var playing = false, playLast = 0;
+function startPlay() { if (S.frame >= S.frames.length - 1) setFrame(0); playing = true; playLast = performance.now(); document.getElementById('fplayicon').setAttribute('d', 'M4 2.5h3v11H4zM9 2.5h3v11H9z'); scheduleDraw(); }
+function stopPlay() { playing = false; document.getElementById('fplayicon').setAttribute('d', 'M4 2.5v11l9-5.5z'); }
+function stepPlay(t) {
+  var per = +document.getElementById('fspeed').value, gap = clamp(per * Math.min(1, 40 / S.frames.length) * 2, per * 0.25, per);
+  if (t - playLast >= gap) { playLast = t; if (S.frame >= S.frames.length - 1) { stopPlay(); return false; } setFrame(S.frame + 1); }
+  return playing;
+}
+document.getElementById('fplay').addEventListener('click', function () { if (playing) stopPlay(); else startPlay(); });
+
+/* the legend: one block for each channel in use, with how many countries fall in each class */
+function counts(ch) {
+  var c = {}, none = 0;
+  COUNTRIES.forEach(function (it) {
+    var L = LOOK[it.idx], k = L ? L.k[ch] : undefined;
+    if (k == null || k < 0) none++; else c[k] = (c[k] || 0) + 1;
+  });
+  return { c: c, none: none };
+}
+function renderLegend() {
+  var el = document.getElementById('legend');
+  if (!S.cols.length || (!SC.colour && !SC.shade && !SC.hatch)) {
+    el.innerHTML = S.cols.length ? '<div class="empty"><p>Choose a column for Colour, Shade or Hatch to map it.</p></div>' :
+      '<div class="empty"><p><b>Map your own data.</b> Open an Excel or CSV file with a column of countries and columns of figures or categories.</p>' +
+      '<p>Numbers take a colour scale; categories and yes/no columns take a colour each. A second column can shade the colours and a third can hatch them.</p>' +
+      '<p>Drag a file onto the page, or try one of the samples to see how it works.</p></div>';
+    return;
+  }
+  var F = S.frames[S.frame], html = '';
+  var many = S.colour.length > 1;
+  var title = SC.colour ? (many ? F.label : SC.colour.col.name) : SC.shade ? SC.shade.col.name : SC.hatch.col.name;
+  var sub = S.step != null ? (timeAxis() ? F.label : colByI(S.step).name + ' ' + F.label) : many ? (timeAxis() ? S.name : 'Step ' + (S.frame + 1) + ' of ' + S.frames.length) : S.name;
+  html += '<div class="ttl">' + esc(title) + '</div><div class="sub">' + esc(sub) + '</div>';
+  ['colour', 'shade', 'hatch'].forEach(function (ch) {
+    var sc = SC[ch];
+    if (!sc) return;
+    var ct = counts(ch);
+    var name = sc.col.name;
+    if (ch === 'colour' && many) name = 'Columns ' + S.frames[0].label + ' to ' + S.frames[S.frames.length - 1].label;
+    if (sc.fit) name += ' · range for ' + S.frames[S.frame].label;
+    html += '<div class="lg"><div class="lt">' + esc(name) + '</div><div class="lk">' + { colour: 'Colour', shade: 'Shade', hatch: 'Hatching' }[ch] + (sc.type === 'num' && sc.pc ? ' · ' + esc(perText(sc.pc)) : '') + (sc.type === 'num' && sc.log ? ' · log scale' : '') + '</div>';
+    if (ch === 'colour' && sc.type === 'num' && !sc.breaks) html += continuousLegend(sc);
+    else if (ch === 'shade' && sc.type === 'num' && !sc.breaks) html += shadeSteps(sc);
+    else for (var k = 0; k < sc.n; k++) html += legendItem(ch, sc, k, ct.c[k] || 0);
+    html += '</div>';
+  });
+  var nd = COUNTRIES.filter(function (it) { var L = LOOK[it.idx]; return !L || !L.fill; }).length;
+  html += '<div class="lg"><div class="li"><span class="sw"><img src="' + swatch(NODATA) + '" alt=""></span><span class="lv">No data, or not in the file</span><span class="ct">' + nd + '</span></div>';
+  if (['colour', 'shade', 'hatch'].some(function (ch) { return SC[ch] && SC[ch].pc; })) {
+    var yr = timeAxis() ? 'each period' : (S.pc.colour || S.pc.shade || S.pc.hatch).year;
+    html += '<div class="note" style="margin-top:8px">Per person: population in ' + esc(yr) + ' from Our World in Data (HYDE, Gapminder and UN World Population Prospects 2024, with its projections from 2024).</div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+  el.querySelectorAll('.li[data-ch]').forEach(function (li) {
+    li.addEventListener('mouseenter', function () { hl = { ch: li.dataset.ch, k: +li.dataset.k }; scheduleDraw(); });
+    li.addEventListener('mouseleave', function () { hl = null; scheduleDraw(); });
+  });
+  el.querySelectorAll('input[type=color]').forEach(function (inp) {
+    inp.addEventListener('input', function () { S.custom[inp.dataset.key] = inp.value; computeLooks(); scheduleDraw(); inp.parentNode.querySelector('img').src = swatch(inp.value); });
+    inp.addEventListener('change', function () { renderLegend(); });
+  });
+  var bar = el.querySelector('canvas.lgbar');
+  if (bar) drawBar(bar, SC.colour);
+}
+function legendItem(ch, sc, k, n) {
+  var fill, kind = null, extra = '';
+  if (ch === 'colour') fill = colourKey(sc, k);
+  else if (ch === 'shade') return shadeItem(sc, shadeLevel(sc, k), sc.label(k), n, k);
+  else { fill = '#59647a'; kind = hatchKind(sc, k); }
+  var custom = ch === 'colour' && sc.type === 'cat';
+  if (custom) extra = '<input type="color" value="' + fill + '" data-key="' + esc(sc.col.name + '\u0001' + sc.label(k)) + '" title="Change this colour">';
+  return '<div class="li" data-ch="' + ch + '" data-k="' + k + '"><span class="sw"><img src="' + swatch(fill, kind) + '" alt="">' + extra + '</span><span class="lv" title="' + esc(sc.label(k)) + '">' + esc(sc.label(k)) + '</span><span class="ct">' + n + '</span></div>';
+}
+/* a shade over the colours in use: a strip of them */
+function shadeItem(sc, f, label, n, k) {
+  var cols = [];
+  if (!SC.colour) cols = [PLAIN];
+  else { var m = SC.colour.type === 'num' ? 6 : Math.min(6, SC.colour.n); for (var j = 0; j < m; j++) cols.push(SC.colour.type === 'num' ? ramp(SC.colour.opts.scheme, SC.colour.opts.rev ? 1 - j / (m - 1) : j / (m - 1)) : colourKey(SC.colour, j)); }
+  return '<div class="li"' + (k != null ? ' data-ch="shade" data-k="' + k + '"' : '') + '><span class="strip" style="display:flex;gap:1px;flex:none;width:30px">' + cols.map(function (c) { return '<i style="display:block;flex:1;height:15px;border-radius:1px;background:' + shadeOf(c, f, sc.opts.toward) + '"></i>'; }).join('') + '</span><span class="lv">' + esc(label) + '</span>' + (n != null ? '<span class="ct">' + n + '</span>' : '') + '</div>';
+}
+function shadeSteps(sc) {
+  var html = '';
+  for (var j = 4; j >= 0; j--) {
+    var x = sc.lo + (sc.hi - sc.lo) * j / 4, t = sc.opts.rev ? 1 - j / 4 : j / 4;
+    html += shadeItem(sc, 1 - sc.opts.strength * (1 - t), fmt(sc.inv(x)), null, null);
+  }
+  return html;
+}
+function continuousLegend(sc) {
+  var ticks = [], n = 5;
+  for (var i = 0; i < n; i++) ticks.push((i === 0 && sc.clipLo ? '≤ ' : i === n - 1 && sc.clipHi ? '≥ ' : '') + fmt(sc.inv(sc.lo + (sc.hi - sc.lo) * i / (n - 1))));
+  return '<canvas class="lgbar" width="536" height="76"></canvas><div class="ticks">' + ticks.map(function (t) { return '<span>' + esc(t) + '</span>'; }).join('') + '</div>';
+}
+/* the colour bar with a histogram of the values over it */
+function drawBar(c, sc) {
+  var g = c.getContext('2d'), w = c.width, h = c.height, barH = 22, bins = 60, hist = new Array(bins).fill(0), max = 0;
+  var o = sc.opts, cen = o.centre != null && !isNaN(o.centre) ? sc.tf(o.centre) : (sc.lo + sc.hi) / 2, d = Math.max(sc.hi - cen, cen - sc.lo) || 1;
+  function tAt(x) { var t = isDiv(o.scheme) ? 0.5 + 0.5 * (x - cen) / d : (x - sc.lo) / (sc.hi - sc.lo); return o.rev ? 1 - t : t; }
+  COUNTRIES.forEach(function (it) {
+    var L = LOOK[it.idx]; if (!L || L.k.colour == null || L.k.colour < 0) return;
+    var x = sc.value(S.body[L.row][S.frames[S.frame].col], it.idx, S.frames[S.frame]); if (x == null) return;
+    var b = clamp(Math.floor((sc.tf(x) - sc.lo) / (sc.hi - sc.lo) * bins), 0, bins - 1); hist[b]++; max = Math.max(max, hist[b]);
+  });
+  for (var i = 0; i < w; i++) { g.fillStyle = ramp(o.scheme, tAt(sc.lo + (sc.hi - sc.lo) * i / (w - 1))); g.fillRect(i, h - barH, 1, barH); }
+  var bw = w / bins, top = h - barH - 4;
+  for (i = 0; i < bins; i++) {
+    if (!hist[i]) continue;
+    var bh = Math.max(2, top * hist[i] / max);
+    g.fillStyle = 'rgba(200,214,236,.55)'; g.fillRect(i * bw + 1, top - bh, bw - 2, bh);
+  }
+}
+function valueLine(name, raw, extra) {
+  return '<div class="tv"><span>' + esc(name) + '</span><span>' + esc(typeof raw === 'number' ? fmtFull(raw) : cellText(raw) || '–') + (extra || '') + '</span></div>';
+}
+function tipHTML(idx) {
+  var it = ITEMS[idx], L = LOOK[OWNER[idx]], html = '<b>' + esc(it.name) + '</b>';
+  if (OWNER[idx] !== idx) html += ' <small>(' + esc(ITEMS[OWNER[idx]].name) + ')</small>';
+  if (!L) return html + '<br><small>No data in the file</small>';
+  var row = S.body[L.row], F = S.frames[S.frame];
+  var raw = cellText(row[S.ccol]);
+  if (raw && norm(raw) !== norm(it.name)) html += '<br><small>“' + esc(raw) + '” in the file</small>';
+  function pcx(ch, raw) {
+    var sc = SC[ch];
+    if (!sc || !sc.pc) return '';
+    var v = sc.value(raw, OWNER[idx], F);
+    return v == null ? ' <small>· no population</small>' : ' <small>· ' + esc(perText(sc.pc, v)) + '</small>';
+  }
+  if (SC.colour) html += valueLine(S.colour.length > 1 ? F.label : SC.colour.col.name, row[F.col], pcx('colour', row[F.col]));
+  if (SC.shade) html += valueLine(SC.shade.col.name, row[S.shade], pcx('shade', row[S.shade]));
+  if (SC.hatch) html += valueLine(SC.hatch.col.name, row[S.hatch], pcx('hatch', row[S.hatch]));
+  if (S.step != null) html += valueLine(colByI(S.step).name, F.label || row[S.step]);
+  return html;
+}
+function renderCard() {
+  var el = document.getElementById('card');
+  if (pinned == null || narrow) { el.style.display = 'none'; return; }
+  var it = ITEMS[pinned], L = LOOK[OWNER[pinned]];
+  var html = '<div class="ttl">' + esc(it.name) + '</div>';
+  if (!L) html += '<div class="note">No row for this country in the file.</div>';
+  else {
+    var row = S.body[L.row];
+    html += '<table>' + S.cols.map(function (c) { return '<tr><td>' + esc(c.name) + '</td><td>' + esc(typeof row[c.i] === 'number' ? fmtFull(row[c.i]) : cellText(row[c.i]) || '–') + '</td></tr>'; }).join('') + '</table>';
+  }
+  document.getElementById('cardbody').innerHTML = html;
+  el.style.display = 'block';
+}
+document.getElementById('cardx').addEventListener('click', function () { pinned = null; renderCard(); scheduleDraw(); });
+
+/* ------------------------------------------------------------ opening files */
+function showError(msg) { document.getElementById('err').textContent = msg || ''; }
+function openFile(file) {
+  if (!file) return;
+  showError('');
+  var text = /\.(csv|tsv|txt)$/i.test(file.name);
+  var rd = new FileReader();
+  rd.onload = function () {
+    try {
+      var wb = text ? XLSX.read(rd.result.replace(/^﻿/, ''), { type: 'string', raw: true }) : XLSX.read(new Uint8Array(rd.result), { type: 'array', cellDates: true });
+      pinned = null;
+      loadWorkbook(wb, file.name);
+    } catch (e) { showError('That file could not be read: ' + (e && e.message ? e.message : e)); }
+  };
+  rd.onerror = function () { showError('That file could not be read.'); };
+  if (text) rd.readAsText(file); else rd.readAsArrayBuffer(file);
+}
+function loadText(text, name) { pinned = null; loadWorkbook(XLSX.read(text, { type: 'string', raw: true }), name || 'table.csv'); }
+document.getElementById('openbtn').addEventListener('click', function () { document.getElementById('file').click(); });
+document.getElementById('file').addEventListener('change', function (e) { openFile(e.target.files[0]); e.target.value = ''; });
+function loadScript(src, done) {
+  var el = document.createElement('script');
+  el.src = src; el.onload = done; el.onerror = function () { showError('Could not load ' + src + '.'); };
+  document.head.appendChild(el);
+}
+var SAMPLES = {
+  world: ['DV_SAMPLE', null, 'Sample: countries of the world, 2019 (Natural Earth)'],
+  co2: ['DV_SAMPLE_CO2', 'data/sample-co2.js', 'Sample: CO₂ emissions from fossil fuels and industry, thousand tonnes (Global Carbon Budget 2025, via Our World in Data)'],
+  life: ['DV_SAMPLE_LIFE', 'data/sample-life.js', 'Sample: life expectancy at birth, years (Riley, Zijdeman et al., HMD and UN WPP, via Our World in Data)'],
+  fertility: ['DV_SAMPLE_FERTILITY', 'data/sample-fertility.js', 'Sample: children born per woman (Human Fertility Database and UN WPP, via Our World in Data)'],
+  gdp: ['DV_SAMPLE_GDP', 'data/sample-gdp.js', 'Sample: GDP per person, international-$ at 2021 prices, PPP (World Bank, via Our World in Data)'],
+  electricity: ['DV_SAMPLE_ELECTRICITY', 'data/sample-electricity.js', 'Sample: share of the population with access to electricity, % (World Bank, via Our World in Data)'],
+  income: ['DV_SAMPLE_INCOME', 'data/sample-income.js', 'Sample: World Bank income groups by year (World Bank, via Our World in Data)']
+};
+function loadSample(k, done) {
+  var sm = SAMPLES[k];
+  if (!sm) return;
+  function go() { loadText(window[sm[0]], sm[2]); if (done) done(); }
+  if (window[sm[0]]) go(); else loadScript(sm[1], go);
+}
+document.getElementById('samplesel').addEventListener('change', function (e) { var k = e.target.value; e.target.value = ''; loadSample(k); });
+document.getElementById('sheet').addEventListener('change', function (e) { loadSheet(e.target.value); });
+document.getElementById('hdr').addEventListener('change', function (e) { S.hdr = +e.target.value; readColumns(true); });
+document.getElementById('ccol').addEventListener('change', function (e) { S.ccol = +e.target.value; S.colour = S.colour.filter(function (c) { return c !== S.ccol; }); if (S.shade === S.ccol) S.shade = null; if (S.hatch === S.ccol) S.hatch = null; S.manual = {}; refresh(); });
+var dropEl = document.getElementById('drop'), dragDepth = 0;
+window.addEventListener('dragenter', function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') >= 0) { dragDepth++; dropEl.classList.add('on'); } });
+window.addEventListener('dragleave', function () { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dropEl.classList.remove('on'); });
+window.addEventListener('dragover', function (e) { e.preventDefault(); });
+window.addEventListener('drop', function (e) { e.preventDefault(); dragDepth = 0; dropEl.classList.remove('on'); if (e.dataTransfer.files[0]) openFile(e.dataTransfer.files[0]); });
+
+/* ------------------------------------------------------------ turning the view */
+var fly = null;
+function flyTo(rot, z) {
+  spin = null;
+  fly = { a: rotation.slice(), b: rot, za: zoom, zb: z || zoom, t0: performance.now(), d: 900 };
+  if (fly.b[0] - fly.a[0] > 180) fly.b[0] -= 360; else if (fly.a[0] - fly.b[0] > 180) fly.b[0] += 360;
+  scheduleDraw();
+}
+function stepFly(now) {
+  if (!fly) return false;
+  var u = clamp((now - fly.t0) / fly.d, 0, 1), e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+  rotation = [fly.a[0] + (fly.b[0] - fly.a[0]) * e, fly.a[1] + (fly.b[1] - fly.a[1]) * e];
+  zoom = fly.za + (fly.zb - fly.za) * e;
+  if (u >= 1) { fly = null; updateHash(); return false; }
+  return true;
+}
+var drag = null, pinch = null, pointers = {}, moved = 0;
+cv.addEventListener('pointerdown', function (e) {
+  pointers[e.pointerId] = [e.clientX, e.clientY];
+  cv.setPointerCapture(e.pointerId);
+  var ids = Object.keys(pointers);
+  if (ids.length === 2) { var a = pointers[ids[0]], b = pointers[ids[1]]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: zoom }; drag = null; }
+  else { drag = { x: e.clientX, y: e.clientY, rot: rotation.slice() }; fly = null; spin = null; moved = 0; trail = [[performance.now(), e.clientX, e.clientY]]; }
+  cv.classList.add('dragging'); hideTip();
+});
+cv.addEventListener('pointermove', function (e) {
+  if (pointers[e.pointerId]) pointers[e.pointerId] = [e.clientX, e.clientY];
+  if (pinch) {
+    var ids = Object.keys(pointers); if (ids.length < 2) return;
+    var a = pointers[ids[0]], b = pointers[ids[1]];
+    zoom = clamp(pinch.z * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d, 0.8, 12); scheduleDraw(); return;
+  }
+  if (drag) {
+    var k = 0.25 / zoom;
+    moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
+    trail.push([performance.now(), e.clientX, e.clientY]); if (trail.length > 8) trail.shift();
+    rotation = [drag.rot[0] + (e.clientX - drag.x) * k, clamp(drag.rot[1] - (e.clientY - drag.y) * k, -90, 90)];
+    updateHash(); scheduleDraw(); return;
+  }
+  hover(e.clientX, e.clientY);
+});
+function endPointer(e) {
+  delete pointers[e.pointerId];
+  if (Object.keys(pointers).length < 2) pinch = null;
+  if (!Object.keys(pointers).length) {
+    if (drag && moved < 4) { var k = itemAt(e.clientX, e.clientY); pinned = k == null ? null : k; renderCard(); scheduleDraw(); }
+    else if (drag) {
+      var now = performance.now(), recent = trail.filter(function (p) { return now - p[0] < 90; });
+      if (recent.length > 1) {
+        var a = recent[0], b = recent[recent.length - 1], dt = Math.max(8, b[0] - a[0]), kk = 0.25 / zoom;
+        var vl = (b[1] - a[1]) / dt * kk, vp = -(b[2] - a[2]) / dt * kk, sp = Math.hypot(vl, vp);
+        if (sp > 0.01) { if (sp > 1.2) { vl *= 1.2 / sp; vp *= 1.2 / sp; } spin = { vl: vl, vp: vp, last: now }; scheduleDraw(); }
+      }
+    }
+    drag = null; cv.classList.remove('dragging');
+  }
+}
+cv.addEventListener('pointerup', endPointer); cv.addEventListener('pointercancel', endPointer);
+cv.addEventListener('pointerleave', function () { if (!drag) { hideTip(); if (hoverItem != null) { hoverItem = null; scheduleDraw(); } } });
+cv.addEventListener('wheel', function (e) { e.preventDefault(); zoom = clamp(zoom * Math.exp(-e.deltaY * 0.0015), 0.8, 12); updateHash(); scheduleDraw(); }, { passive: false });
+
+function inRings(it, ll) {
+  var b = it.box;
+  if (ll[0] < b[0] - 1e-6 || ll[0] > b[2] + 1e-6 || ll[1] < b[1] - 1e-6 || ll[1] > b[3] + 1e-6) return false;
+  var n = 0;
+  for (var i = 0; i < it.rings.length; i++) if (d3.geoContains({ type: 'Polygon', coordinates: [it.rings[i]] }, ll)) n++;
+  return n % 2 === 1;
+}
+function itemAt(x, y) {
+  if (Math.hypot(x - CX, y - CY) > R0 * zoom) return null;
+  if (zoom < 5) for (var j = 0; j < ITEMS.length; j++) {
+    var s = ITEMS[j];
+    if (!s.small || OWNER[j] !== j || s.labV[0] * viewV[0] + s.labV[1] * viewV[1] + s.labV[2] * viewV[2] < 0.05) continue;
+    var p = projection(s.lab);
+    if (p && Math.hypot(p[0] - x, p[1] - y) < 6) return j;
+  }
+  var ll = projection.invert([x, y]);
+  if (!ll) return null;
+  for (var i = 0; i < ITEMS.length; i++) if (inRings(ITEMS[i], ll)) return i;
+  return null;
+}
+function hover(x, y) {
+  var k = itemAt(x, y);
+  if (k !== hoverItem) { hoverItem = k; scheduleDraw(); }
+  if (k == null) { hideTip(); return; }
+  showTip(tipHTML(k), x, y);
+}
+var tipEl = document.getElementById('tip');
+function showTip(html, x, y) {
+  tipEl.innerHTML = html; tipEl.style.display = 'block';
+  var w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  tipEl.style.left = clamp(x + 14, 4, W - w - 4) + 'px'; tipEl.style.top = clamp(y + 14, 4, H - h - 4) + 'px';
+}
+function hideTip() { tipEl.style.display = 'none'; }
+
+var hashTimer = 0;
+function updateHash() {
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(function () { history.replaceState(null, '', '#v=' + rotation.map(function (x) { return x.toFixed(1); }).join(',') + '&z=' + zoom.toFixed(2)); }, 300);
+}
+(function readHash() {
+  var h = {}; location.hash.slice(1).split('&').forEach(function (kv) { var p = kv.split('='); if (p[1]) h[p[0]] = decodeURIComponent(p[1]); });
+  if (h.v) { var v = h.v.split(',').map(Number); if (v.length === 2 && !isNaN(v[0])) rotation = v; }
+  if (h.z && !isNaN(+h.z)) zoom = clamp(+h.z, 0.8, 12);
+})();
+
+/* the side panels, put away and brought back one by one; remembered in this browser */
+var FOLD = { data: false, legend: false };
+try { var fs = JSON.parse(localStorage.getItem('dv-fold') || '{}'); FOLD.data = !!fs.data; FOLD.legend = !!fs.legend; } catch (e) {}
+function setFold(k, v) {
+  FOLD[k] = v;
+  document.body.classList.toggle('fold-' + k, v);
+  try { localStorage.setItem('dv-fold', JSON.stringify(FOLD)); } catch (e) {}
+  resize();
+}
+document.querySelectorAll('[data-fold]').forEach(function (b) { b.addEventListener('click', function () { setFold(b.dataset.fold, true); }); });
+document.querySelectorAll('[data-unfold]').forEach(function (b) { b.addEventListener('click', function () { setFold(b.dataset.unfold, false); }); });
+['data', 'legend'].forEach(function (k) { document.body.classList.toggle('fold-' + k, FOLD[k]); });
+
+window.addEventListener('resize', resize);
+computeLooks(); renderLegend(); resize();
+
+window.DV = {
+  loadText: loadText, sample: function (k, done) { loadSample(k || 'world', done); }, popReady: function () { return !!POP; },
+  state: function () { return S; }, scales: function () { return SC; },
+  channel: function (name, ch, add) { var c = S.cols.filter(function (x) { return x.name === name; })[0]; if (c) toggleChannel(c.i, ch, add); },
+  setStep: function (name) { var el = document.getElementById('step'), c = S.cols.filter(function (x) { return x.name === name; })[0]; el.value = c ? c.i : ''; el.dispatchEvent(new Event('change')); },
+  setFrame: setFrame, frames: function () { return S.frames.map(function (F) { return [F.label, F.t]; }); }, period: function (v, fy) { return periodAt(parsePeriod(v, fy), (parsePeriod(v, fy) || {}).g); },
+  spinning: function () { return !!spin; }, fold: setFold, centre: function () { return [CX, CY, R0]; }, match: function (s) { var i = matchCell(s, true); return i == null ? null : ITEMS[i].name; },
+  look: function (iso3) { var it = ITEMS.filter(function (x) { return x.iso3 === iso3; })[0]; return it ? LOOK[it.idx] : null; },
+  setView: function (lon, lat, z) { fly = null; rotation = [-lon, -lat]; if (z) zoom = z; scheduleDraw(); },
+  project: function (ll) { applyProjection(); return projection(ll); },
+  drawMs: function () { draw(); return lastDrawMs; }, renderer: function () { return GL ? GL.renderer() : '2d'; },
+  pin: function (iso3) { var it = ITEMS.filter(function (x) { return x.iso3 === iso3; })[0]; pinned = it ? it.idx : null; renderCard(); scheduleDraw(); }
+};
+})();
+</script>
+</body>
+</html>
