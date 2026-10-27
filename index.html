@@ -112,7 +112,26 @@ label.lab{color:var(--ink-dim);font-size:11.5px;min-width:64px}
 #legend .empty{color:var(--ink-dim);font-size:12.5px;line-height:1.55}
 #legend .empty p{margin:0 0 8px}
 
-#card{right:16px;bottom:16px;width:300px;max-height:40%;overflow:auto;padding:12px 14px;display:none}
+#card{right:16px;bottom:16px;width:auto;min-width:280px;max-width:min(640px,46vw);max-height:46%;overflow:hidden;padding:12px 14px 10px;display:none;flex-direction:column}
+#cardbody{display:flex;flex-direction:column;min-height:0;flex:1}
+#card .cscroll{overflow:auto;min-height:0;flex:1}
+body.has-frames #card{bottom:90px;max-height:calc(54% - 90px)}
+body.has-card #legend{max-height:calc(52% - 40px)}
+#card .csub{color:var(--ink-faint);font-size:11px;margin:-2px 0 8px}
+#card table.cmp{width:auto;min-width:100%}
+#card table.cmp th{position:sticky;top:0;background:#101624;font-weight:500;font-size:11px;color:var(--ink);text-align:right;padding:4px 8px 5px;white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.1)}
+#card table.cmp th:first-child{text-align:left;padding-left:2px;color:var(--ink-faint);font-weight:400}
+#card table.cmp th i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
+#card table.cmp th button{background:none;border:0;padding:0 0 0 4px;color:var(--ink-faint);cursor:pointer;font-size:12px}
+#card table.cmp th button:hover{color:var(--ink)}
+#card table.cmp td{text-align:right;padding:2px 8px;width:auto;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+#card table.cmp td:first-child{text-align:left;padding-left:2px;color:var(--ink-faint)}
+#card table.cmp.timed tbody tr{cursor:pointer}
+#card table.cmp tbody tr:hover td{background:rgba(255,255,255,.05)}
+#card table.cmp tr.now td{background:rgba(142,208,255,.16);color:#fff}
+#card .chint{margin-top:8px;color:var(--ink-faint);font-size:10.5px;display:flex;gap:10px;justify-content:space-between;align-items:center}
+#card .chint button{background:none;border:1px solid rgba(255,255,255,.14);border-radius:7px;color:var(--ink-dim);cursor:pointer;font-size:10.5px;padding:2px 8px}
+#card .chint button:hover{color:var(--ink)}
 #card .ttl{font-family:var(--serif);font-size:18px;font-weight:300;margin-bottom:6px;padding-right:20px}
 #card table{border-collapse:collapse;width:100%;font-size:11.5px}
 #card td{padding:2px 0;vertical-align:top}
@@ -1182,7 +1201,14 @@ function foldable(it) {
 }
 function visibleCap(it) { return it.cap[0] * viewV[0] + it.cap[1] * viewV[1] + it.cap[2] * viewV[2] > -Math.sin(Math.min(Math.PI / 2, it.capR)) - 0.01; }
 var clipRings = GL ? GlobeGL.ringCollector() : null, clipPath = GL ? d3.geoPath(projection, clipRings) : null;
-var hl = null, hoverItem = null, pinned = null;
+var hl = null, hoverItem = null, SEL = [];
+/* select a country (its owner, so a territory drawn apart selects its country); add toggles it in a selection */
+function select(k, add) {
+  if (k == null) { if (!add) SEL = []; }
+  else if (add) { var at = SEL.indexOf(k); if (at >= 0) SEL.splice(at, 1); else SEL.push(k); }
+  else SEL = SEL.length === 1 && SEL[0] === k ? [] : [k];
+  renderCard(); scheduleDraw();
+}
 function fillOf(it) {
   var L = LOOK[it.idx], f = L && L.fill ? L.fill : NODATA;
   if (hl && !(L && L.k[hl.ch] === hl.k)) f = mix(f, '#161c28', 0.72);
@@ -1249,10 +1275,13 @@ function draw() {
     if (L && L.hatch && !(hl && L.k[hl.ch] !== hl.k)) { ctx.lineWidth = 1.6; ctx.strokeStyle = '#ffffff'; ctx.stroke(); }
     ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(6,10,18,.85)'; ctx.stroke();
   }
-  [pinned, hoverItem].forEach(function (k, j) {
-    if (k == null) return;
-    ctx.beginPath(); path(ITEMS[k].geo); ctx.strokeStyle = j ? 'rgba(255,255,255,.95)' : 'rgba(142,208,255,.95)'; ctx.lineWidth = j ? 1.4 : 1.8; ctx.stroke();
-  });
+  if (SEL.length) {
+    ctx.beginPath();
+    for (i = 0; i < ITEMS.length; i++) if (SEL.indexOf(OWNER[i]) >= 0 && visibleCap(ITEMS[i])) path(ITEMS[i].geo);
+    ctx.strokeStyle = 'rgba(6,10,18,.9)'; ctx.lineWidth = 3.4; ctx.stroke();
+    ctx.strokeStyle = '#8ed0ff'; ctx.lineWidth = 1.8; ctx.stroke();
+  }
+  if (hoverItem != null) { ctx.beginPath(); path(ITEMS[hoverItem].geo); ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 1.4; ctx.stroke(); }
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.lineWidth = 1; ctx.strokeStyle = PAL.rim; ctx.stroke();
   lastDrawMs = performance.now() - t0;
 }
@@ -1495,6 +1524,7 @@ fcv.addEventListener('pointermove', function (e) {
 fcv.addEventListener('pointerleave', function () { if (!fdrag) hideTip(); });
 ['pointerup', 'pointercancel'].forEach(function (n) { fcv.addEventListener(n, function () { fdrag = false; }); });
 window.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && SEL.length) { select(null, false); return; }
   if (S.frames.length < 2 || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
   if (e.key === 'ArrowLeft') { stopPlay(); setFrame(S.frame - 1); e.preventDefault(); }
   else if (e.key === 'ArrowRight') { stopPlay(); setFrame(S.frame + 1); e.preventDefault(); }
@@ -1504,6 +1534,7 @@ function renderFrames() {
   var el = document.getElementById('frames');
   var on = S.frames.length > 1;
   el.classList.toggle('on', on);
+  document.body.classList.toggle('has-frames', on);
   if (!on) { stopPlay(); return; }
   document.getElementById('flabel').textContent = S.frames[S.frame].label;
   requestAnimationFrame(drawScrubber);
@@ -1513,7 +1544,7 @@ function setFrame(k) {
   if (['colour', 'shade', 'hatch'].some(function (ch) { return SC[ch] && SC[ch].fit; })) buildScales();
   computeLooks();
   document.getElementById('flabel').textContent = S.frames[S.frame].label;
-  drawScrubber(); renderLegend(); renderCard(); scheduleDraw();
+  drawScrubber(); renderLegend(); renderCard(true); scheduleDraw();
 }
 var playing = false, playLast = 0;
 function startPlay() { if (S.frame >= S.frames.length - 1) setFrame(0); playing = true; playLast = performance.now(); document.getElementById('fplayicon').setAttribute('d', 'M4 2.5h3v11H4zM9 2.5h3v11H9z'); scheduleDraw(); }
@@ -1649,20 +1680,86 @@ function tipHTML(idx) {
   if (S.step != null) html += valueLine(colByI(S.step).name, F.label || row[S.step]);
   return html;
 }
-function renderCard() {
-  var el = document.getElementById('card');
-  if (pinned == null || narrow) { el.style.display = 'none'; return; }
-  var it = ITEMS[pinned], L = LOOK[OWNER[pinned]];
-  var html = '<div class="ttl">' + esc(it.name) + '</div>';
-  if (!L) html += '<div class="note">No row for this country in the file.</div>';
-  else {
-    var row = S.body[L.row];
-    html += '<table>' + S.cols.map(function (c) { return '<tr><td>' + esc(c.name) + '</td><td>' + esc(typeof row[c.i] === 'number' ? fmtFull(row[c.i]) : cellText(row[c.i]) || '–') + '</td></tr>'; }).join('') + '</table>';
-  }
-  document.getElementById('cardbody').innerHTML = html;
-  el.style.display = 'block';
+/* the value a country shows in the comparison for a step: the mapped column (per person if that is on) */
+function cmpValue(item, F) {
+  var sc = SC.colour || SC.shade || SC.hatch;
+  if (!sc) return null;
+  var col = SC.colour ? F.col : SC.shade ? S.shade : S.hatch, k = F.rows[item];
+  if (k == null || col == null) return null;
+  var raw = S.body[k][col];
+  if (sc.type === 'num') return sc.value(raw, item, F);
+  return sc.value(raw);
 }
-document.getElementById('cardx').addEventListener('click', function () { pinned = null; renderCard(); scheduleDraw(); });
+function cmpText(v) {
+  if (v == null) return '–';
+  if (typeof v !== 'number') return String(v);
+  var a = Math.abs(v);
+  if (a >= 1000) return Math.round(v).toLocaleString('en-AU');
+  return a === 0 ? '0' : Number(v.toPrecision(3)).toLocaleString('en-AU', { maximumFractionDigits: 6 });
+}
+var cardKey = '';
+function renderCard(light) {
+  var el = document.getElementById('card');
+  document.body.classList.toggle('has-card', SEL.length > 0 && !narrow);
+  if (!SEL.length || narrow) { el.style.display = 'none'; cardKey = ''; return; }
+  var steps = S.frames.length > 1, sc = SC.colour || SC.shade || SC.hatch;
+  var key = SEL.join(',') + '|' + S.frames.length + '|' + S.name + '|' + (sc ? sc.col.i + JSON.stringify(sc.opts) + JSON.stringify(S.pc) : '');
+  if (light && steps && key === cardKey) { markNow(el); return; }
+  cardKey = key;
+  var names = SEL.map(function (k) { return ITEMS[k].name; });
+  var html = '<div class="ttl">' + esc(SEL.length <= 3 ? names.join(' · ') : SEL.length + ' countries') + '</div>';
+  var head = function (first) {
+    return '<thead><tr><th>' + esc(first) + '</th>' + SEL.map(function (k) {
+      var L = LOOK[k];
+      return '<th title="' + esc(ITEMS[k].name) + '"><i style="background:' + (L && L.fill ? L.fill : NODATA) + '"></i>' + esc(ITEMS[k].name.length > 18 ? ITEMS[k].name.slice(0, 17) + '…' : ITEMS[k].name) +
+        (SEL.length > 1 ? '<button data-drop="' + k + '" title="Take ' + esc(ITEMS[k].name) + ' out">×</button>' : '') + '</th>';
+    }).join('') + '</tr></thead>';
+  };
+  var rows = [];
+  if (steps && sc) {
+    /* each period down the side, the countries across */
+    var what = SC.colour ? (S.colour.length > 1 ? 'Columns ' + S.frames[0].label + ' to ' + S.frames[S.frames.length - 1].label : SC.colour.col.name) : sc.col.name;
+    html += '<div class="csub">' + esc(what) + (sc.pc ? ' · ' + esc(perText(sc.pc)) : '') + '</div>';
+    html += '<div class="cscroll"><table class="cmp timed">' + head(S.step != null ? colByI(S.step).name : timeAxis() ? 'Period' : 'Step') + '<tbody>';
+    S.frames.forEach(function (F, f) {
+      var vals = SEL.map(function (k) { return cmpValue(k, F); });
+      rows.push([F.label].concat(vals.map(cmpText)));
+      html += '<tr data-f="' + f + '"' + (f === S.frame ? ' class="now"' : '') + '><td>' + esc(F.label) + '</td>' + vals.map(function (v) { return '<td>' + esc(cmpText(v)) + '</td>'; }).join('') + '</tr>';
+    });
+    html += '</tbody></table></div>';
+  } else {
+    /* one row each: every column of the file, the countries across */
+    html += '<div class="cscroll"><table class="cmp">' + head('') + '<tbody>';
+    S.cols.forEach(function (c) {
+      var vals = SEL.map(function (k) { var L = LOOK[k]; if (!L) return '–'; var v = S.body[L.row][c.i], x = c.type === 'num' ? parseNum(v) : NaN; return x != null && !isNaN(x) ? fmtFull(x) : cellText(v) || '–'; });
+      rows.push([c.name].concat(vals));
+      html += '<tr><td>' + esc(c.name) + '</td>' + vals.map(function (v) { return '<td>' + esc(v) + '</td>'; }).join('') + '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '<div class="chint"><span>Shift- or Ctrl-click to add countries · Esc to clear</span><button id="cardcopy" title="Copy the table, to paste into a spreadsheet">Copy</button></div>';
+  document.getElementById('cardbody').innerHTML = html;
+  el.style.display = 'flex';
+  el.querySelectorAll('tbody tr[data-f]').forEach(function (tr) { tr.addEventListener('click', function () { stopPlay(); setFrame(+tr.dataset.f); }); });
+  el.querySelectorAll('button[data-drop]').forEach(function (b) { b.addEventListener('click', function () { select(+b.dataset.drop, true); }); });
+  var cp = document.getElementById('cardcopy');
+  cp.addEventListener('click', function () {
+    var tsv = [[''].concat(names)].concat(rows).map(function (r) { return r.join('\t'); }).join('\n');
+    var done = function () { cp.textContent = 'Copied'; setTimeout(function () { cp.textContent = 'Copy'; }, 1400); };
+    try { navigator.clipboard.writeText(tsv).then(done, function () { cp.textContent = 'Could not copy'; }); } catch (e) { cp.textContent = 'Could not copy'; }
+  });
+  markNow(el);
+}
+/* the step shown, picked out and kept in view */
+function markNow(card) {
+  var now = null, el = card.querySelector('.cscroll') || card;
+  el.querySelectorAll('tbody tr[data-f]').forEach(function (tr) { var on = +tr.dataset.f === S.frame; tr.classList.toggle('now', on); if (on) now = tr; });
+  if (now) {
+    var rel = now.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    if (rel < 30 || rel > el.clientHeight - 24) el.scrollTop = Math.max(0, el.scrollTop + rel - el.clientHeight / 2);
+  }
+}
+document.getElementById('cardx').addEventListener('click', function () { select(null, false); });
 
 /* ------------------------------------------------------------ opening files */
 function showError(msg) { document.getElementById('err').textContent = msg || ''; }
@@ -1674,14 +1771,14 @@ function openFile(file) {
   rd.onload = function () {
     try {
       var wb = text ? XLSX.read(rd.result.replace(/^﻿/, ''), { type: 'string', raw: true }) : XLSX.read(new Uint8Array(rd.result), { type: 'array', cellDates: true });
-      pinned = null;
+      SEL = [];
       loadWorkbook(wb, file.name);
     } catch (e) { showError('That file could not be read: ' + (e && e.message ? e.message : e)); }
   };
   rd.onerror = function () { showError('That file could not be read.'); };
   if (text) rd.readAsText(file); else rd.readAsArrayBuffer(file);
 }
-function loadText(text, name) { pinned = null; loadWorkbook(XLSX.read(text, { type: 'string', raw: true }), name || 'table.csv'); }
+function loadText(text, name) { SEL = []; loadWorkbook(XLSX.read(text, { type: 'string', raw: true }), name || 'table.csv'); }
 document.getElementById('openbtn').addEventListener('click', function () { document.getElementById('file').click(); });
 document.getElementById('file').addEventListener('change', function (e) { openFile(e.target.files[0]); e.target.value = ''; });
 function loadScript(src, done) {
@@ -1759,7 +1856,7 @@ function endPointer(e) {
   delete pointers[e.pointerId];
   if (Object.keys(pointers).length < 2) pinch = null;
   if (!Object.keys(pointers).length) {
-    if (drag && moved < 4) { var k = itemAt(e.clientX, e.clientY); pinned = k == null ? null : k; renderCard(); scheduleDraw(); }
+    if (drag && moved < 4) { var k = itemAt(e.clientX, e.clientY); select(k == null ? null : OWNER[k], e.shiftKey || e.ctrlKey || e.metaKey); }
     else if (drag) {
       var now = performance.now(), recent = trail.filter(function (p) { return now - p[0] < 90; });
       if (recent.length > 1) {
@@ -1847,7 +1944,8 @@ window.DV = {
   setView: function (lon, lat, z) { fly = null; rotation = [-lon, -lat]; if (z) zoom = z; scheduleDraw(); },
   project: function (ll) { applyProjection(); return projection(ll); },
   drawMs: function () { draw(); return lastDrawMs; }, renderer: function () { return GL ? GL.renderer() : '2d'; },
-  pin: function (iso3) { var it = ITEMS.filter(function (x) { return x.iso3 === iso3; })[0]; pinned = it ? it.idx : null; renderCard(); scheduleDraw(); }
+  pin: function (iso3, add) { var it = ITEMS.filter(function (x) { return x.iso3 === iso3; })[0]; select(it ? OWNER[it.idx] : null, add); },
+  selection: function () { return SEL.map(function (k) { return ITEMS[k].iso3 || ITEMS[k].name; }); }
 };
 })();
 </script>
