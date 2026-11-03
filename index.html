@@ -1829,6 +1829,8 @@ function setFrame(k) {
   computeLooks();
   document.getElementById('flabel').textContent = S.frames[S.frame].label;
   drawScrubber(); renderLegend(); renderCard(true); scheduleDraw();
+  /* a country's hover card follows the time line while it plays or is scrubbed */
+  if (hoverAt && tipEl.style.display === 'block' && hoverItem != null) hover(hoverAt[0], hoverAt[1]);
 }
 var playing = false, playLast = 0;
 function startPlay() { if (S.frame >= S.frames.length - 1) setFrame(0); playing = true; playLast = performance.now(); document.getElementById('fplayicon').setAttribute('d', 'M4 2.5h3v11H4zM9 2.5h3v11H9z'); scheduleDraw(); }
@@ -2409,7 +2411,9 @@ function itemAt(x, y) {
   for (var i = 0; i < ITEMS.length; i++) if (inRings(ITEMS[i], ll)) return i;
   return null;
 }
+var hoverAt = null;
 function hover(x, y) {
+  hoverAt = [x, y];
   var k = itemAt(x, y);
   if (k !== hoverItem) { hoverItem = k; scheduleDraw(); }
   if (k == null) { hideTip(); return; }
