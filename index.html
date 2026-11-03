@@ -4,10 +4,11 @@
 <!--
   Data Visualiser
   Copyright 2026 Laurence F. White. All rights reserved.
-  Country boundaries: Natural Earth (public domain). Population and the CO2 sample: Our World in Data (CC BY 4.0),
-  from HYDE, Gapminder, UN WPP 2024 and the Global Carbon Budget 2025. Colour schemes after ColorBrewer (Cynthia Brewer, Apache 2.0),
+  Country boundaries: Natural Earth (public domain). Population and the Our World in Data samples (CC BY 4.0, CC BY 3.0 IGO for HDI, CC BY-SA 4.0 for V-Dem),
+  from HYDE, Gapminder, UN WPP 2024, the Global Carbon Budget 2025, UNDP and V-Dem v16. World Bank WDI and Changing Wealth of Nations samples: World Bank (CC BY 4.0). Colour schemes after ColorBrewer (Cynthia Brewer, Apache 2.0),
   viridis (Smith and van der Walt, CC0) and Tableau 10. d3 (ISC), topojson-client (BSD), SheetJS Community
-  Edition (Apache 2.0).
+  Edition (Apache 2.0). The V-Dem sample files data/sample-electdem.js and data/sample-regime.js are adapted from V-Dem v16
+  (Coppedge et al., doi:10.23696/vdemds26) and offered under CC BY-SA 4.0; the rest of this page is not.
 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -61,7 +62,7 @@ h3{margin:0 0 8px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase
 .row+.row{margin-top:7px}
 label.lab{color:var(--ink-dim);font-size:11.5px;min-width:64px}
 
-#data{left:16px;top:84px;width:318px;max-height:calc(100% - 100px);overflow:auto;padding:14px 16px}
+#data{left:16px;top:116px;width:368px;max-height:calc(100% - 132px);overflow:auto;padding:14px 12px 14px 18px;scrollbar-gutter:stable}
 #open{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
 #samplesel{padding:8px 26px 8px 12px;font-size:12.5px;border-radius:10px}
 .big{padding:8px 14px;border-radius:10px;border:1px solid rgba(142,208,255,.45);background:rgba(142,208,255,.14);color:var(--ink);cursor:pointer;font-size:12.5px}
@@ -91,7 +92,7 @@ label.lab{color:var(--ink-dim);font-size:11.5px;min-width:64px}
 #opts input[type=checkbox]{accent-color:#8ed0ff}
 .chk{display:inline-flex;gap:5px;align-items:center;color:var(--ink-dim);font-size:11.5px;cursor:pointer}
 
-#legend{right:16px;top:16px;width:300px;max-height:calc(100% - 140px);overflow:auto;padding:14px 16px}
+#legend{right:16px;top:16px;width:300px;max-height:calc(100% - 140px);overflow:auto;padding:14px 12px 14px 16px;scrollbar-gutter:stable}
 #legend .ttl{font-family:var(--serif);font-size:19px;font-weight:300;line-height:1.2;margin-bottom:2px}
 #legend .sub{color:var(--ink-faint);font-size:11px;margin-bottom:10px}
 .lg+.lg{margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
@@ -115,6 +116,14 @@ label.lab{color:var(--ink-dim);font-size:11.5px;min-width:64px}
 #card{right:16px;bottom:16px;width:auto;min-width:280px;max-width:min(640px,46vw);max-height:46%;overflow:hidden;padding:12px 14px 10px;display:none;flex-direction:column}
 #cardbody{display:flex;flex-direction:column;min-height:0;flex:1}
 #card .cscroll{overflow:auto;min-height:0;flex:1}
+/* scrollbars: a slim rounded thumb on a clear track, so the panels keep their shape */
+.panel ::-webkit-scrollbar,.panel::-webkit-scrollbar{width:10px;height:10px}
+.panel ::-webkit-scrollbar-track,.panel::-webkit-scrollbar-track{background:transparent}
+.panel ::-webkit-scrollbar-thumb,.panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:10px;border:3px solid transparent;background-clip:padding-box}
+.panel ::-webkit-scrollbar-thumb:hover,.panel::-webkit-scrollbar-thumb:hover{background-color:rgba(142,208,255,.45)}
+.panel ::-webkit-scrollbar-button,.panel::-webkit-scrollbar-button{display:none;height:0;width:0}
+.panel ::-webkit-scrollbar-corner,.panel::-webkit-scrollbar-corner{background:transparent}
+@supports (-moz-appearance:none){.panel,.panel *{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}}
 body.has-frames #card{bottom:90px;max-height:calc(54% - 90px)}
 body.has-card #legend{max-height:calc(52% - 40px)}
 #card .csub{color:var(--ink-faint);font-size:11px;margin:-2px 0 8px}
@@ -160,37 +169,63 @@ body.has-card #legend{max-height:calc(52% - 40px)}
 #drop.on{display:flex}
 #credit{position:absolute;left:18px;bottom:2px;z-index:1;font-size:10px;color:#4a566c}
 #err{color:#ffb4a2}
-#finddata{margin-top:10px}
-#finddata summary{cursor:pointer;color:var(--accent);font-size:11.5px}
-#finddata ul{margin:8px 0;padding-left:16px;color:var(--ink-dim);font-size:11.5px;line-height:1.45}
-#finddata li+li{margin-top:5px}
-#finddata a{color:var(--ink)}
-#finddata a:hover{color:var(--accent)}
+#fsrc{margin-top:4px}
+#legend .src{color:var(--ink-faint);font-size:10.5px;margin:-6px 0 10px;line-height:1.4}
+#legend .src.warn,#fsrc.warn{color:#ffd28a}
+#wbdlg{position:fixed;inset:0;z-index:30;display:none;align-items:flex-start;justify-content:center;padding:70px 12px 12px;background:rgba(2,4,9,.55)}
+#wbdlg.on{display:flex}
+#wbbox{width:min(520px,100%);max-height:calc(100% - 20px);display:flex;flex-direction:column;position:relative;padding:16px 16px 12px;background:#0d121d;border:1px solid var(--panel-brd);border-radius:14px;box-shadow:var(--shadow);color:var(--ink)}
+#wbbox h3{margin:0 0 4px;font-size:14px;font-weight:600;padding-right:24px}
+#wbx{position:absolute;right:8px;top:6px;background:none;border:0;color:var(--ink-dim);font-size:20px;cursor:pointer;line-height:1}
+#wbq{width:100%;box-sizing:border-box;margin:10px 0 6px;padding:9px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:var(--ink);font-size:14px}
+#wbstat{min-height:16px}
+#wbres{overflow:auto;margin-top:4px;border-top:1px solid rgba(255,255,255,.08)}
+#wbres button{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid rgba(255,255,255,.06);padding:8px 4px;color:var(--ink);cursor:pointer;font:inherit}
+#wbres button:hover,#wbres button:focus{background:rgba(142,208,255,.1);outline:none}
+#wbres .n{font-size:12.5px;line-height:1.35}
+#wbres .c{font-size:11px;color:var(--ink-faint);margin-top:1px;overflow-wrap:anywhere}
+#wbbox.busy #wbres{opacity:.4;pointer-events:none}
+.spin{display:inline-block;width:11px;height:11px;border:2px solid rgba(255,255,255,.25);border-top-color:var(--accent);border-radius:50%;animation:wbspin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes wbspin{to{transform:rotate(360deg)}}
+#finddata,#licences{margin-top:10px}
+#finddata summary,#licences summary{cursor:pointer;color:var(--accent);font-size:11.5px}
+#finddata ul,#licences ul{margin:8px 0;padding-left:16px;color:var(--ink-dim);font-size:11.5px;line-height:1.45}
+#finddata li+li,#licences li+li{margin-top:5px}
+#finddata a,#licences a{color:var(--ink)}
+#finddata a:hover,#licences a:hover{color:var(--accent)}
 .fold{position:absolute;top:9px;right:9px;z-index:1;width:24px;height:24px;padding:0;border-radius:7px;border:1px solid rgba(255,255,255,.12);background:rgba(13,18,29,.6);color:var(--ink-faint);cursor:pointer;font-size:15px;line-height:20px}
 .fold:hover{color:var(--ink);border-color:rgba(255,255,255,.3)}
 #legend .ttl,#legend .empty{padding-right:26px}
 #fold-legend{position:absolute;top:25px;right:25px;z-index:3}
 body.fold-legend #fold-legend{display:none}
-.tab{position:absolute;z-index:3;display:none;padding:9px 11px;background:var(--panel);border:1px solid var(--panel-brd);color:var(--ink-dim);cursor:pointer;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;box-shadow:var(--shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-.tab:hover{color:var(--ink)}
-#tab-data{left:0;top:84px;border-left:0;border-radius:0 10px 10px 0}
-#tab-legend{right:0;top:16px;border-right:0;border-radius:10px 0 0 10px}
+.tab{position:absolute;z-index:3;display:none;align-items:center;min-height:34px;padding:0 14px;border-radius:999px;background:var(--panel);border:1px solid var(--panel-brd);color:var(--ink-dim);cursor:pointer;font-size:12px;letter-spacing:.04em;box-shadow:var(--shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.tab:hover{color:var(--ink);border-color:rgba(255,255,255,.3)}
+#tab-data{left:16px;top:116px}
+#tab-legend{right:16px;top:16px}
 body.fold-data #data,body.fold-legend #legend{display:none}
-body.fold-data #tab-data,body.fold-legend #tab-legend{display:block}
-body.fold-data #frames,body.fold-legend #frames{width:min(860px,calc(100% - 400px))}
-body.fold-data.fold-legend #frames{width:min(860px,calc(100% - 60px))}
+body.fold-data #tab-data,body.fold-legend #tab-legend{display:flex}
 
+#viewbar{position:absolute;left:16px;top:76px;z-index:2;display:flex;gap:6px;align-items:center;padding:3px;border-radius:999px;background:var(--panel);border:1px solid var(--panel-brd);box-shadow:var(--shadow);backdrop-filter:blur(10px)}
+.seg{display:flex;gap:2px}
+.seg .chip{padding:3px 11px;border-radius:999px;border-color:transparent;background:transparent;font-size:11.5px}
+.seg .chip.on{background:rgba(142,208,255,.16);border-color:rgba(142,208,255,.45)}
+#vproj{display:none;margin:0 2px 0 4px;padding:3px 24px 3px 11px;border-radius:999px;font-size:11.5px;color:inherit;background-color:transparent;border-color:rgba(255,255,255,.14)}
+body.flat #vproj{display:block}
+#vproj option{background:#0d121d;color:#e6edf7}
+#vnote{position:absolute;z-index:2;display:none;transform:translateX(-50%);top:14px;max-width:340px;text-align:center;padding:4px 11px;border-radius:9px;background:rgba(13,18,29,.82);border:1px solid var(--panel-brd);color:var(--ink-dim);font-size:11px;line-height:1.4}
+body.flat #globe{cursor:grab}
 @media (max-width:900px){
   #brand h1{font-size:20px}
   #brand p{display:none}
   #data{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:42%}
+  #viewbar{top:48px}
   #legend{left:8px;right:8px;top:48px;width:auto;max-height:28%}
   #card{display:none!important}
   #frames{bottom:calc(42% + 16px);width:auto;left:8px;right:8px;transform:none;min-width:0}
   #fspeed{display:none}
   #views,#credit{display:none}
-  #tab-data{top:auto;bottom:8px}
-  #tab-legend{top:48px}
+  #tab-data{top:auto;bottom:8px;left:8px}
+  #tab-legend{top:8px;right:8px}
   #fold-legend{top:57px;right:17px}
   body.fold-data #frames{bottom:56px}
 }
@@ -209,12 +244,13 @@ body.fold-data.fold-legend #frames{width:min(860px,calc(100% - 60px))}
     <h3>Data</h3>
     <div id="open">
       <button class="big" id="openbtn">Open a spreadsheet…</button>
-      <select class="chip" id="samplesel" aria-label="Try a sample"><option value="">Try a sample…</option><optgroup label="One year"><option value="world">Countries of the world, 2019</option></optgroup><optgroup label="Over time"><option value="co2">CO₂ emissions, 1850–2024</option><option value="life">Life expectancy, 1800–2023</option><option value="fertility">Children per woman, 1950–2023</option><option value="gdp">GDP per person (PPP), 1990–2025</option><option value="electricity">Access to electricity, 1990–2024</option><option value="income">Income groups, 1987–2025</option></optgroup></select>
+      <select class="chip" id="samplesel" aria-label="Try a sample"><option value="">Try a sample…</option><optgroup label="One year"><option value="world">Countries of the world, 2019</option></optgroup><optgroup label="Over time"><option value="co2">CO₂ emissions, 1850–2024</option><option value="life">Life expectancy, 1800–2023</option><option value="fertility">Children per woman, 1950–2023</option><option value="gdp">GDP per person (PPP), 1990–2025</option><option value="electricity">Access to electricity, 1990–2024</option><option value="income">Income groups, 1987–2025</option></optgroup><optgroup label="World Bank – World Development Indicators"><option value="wbsearch">Search any World Bank indicator…</option><option value="wdi_pop">Population, total (people), 1960–2025</option><option value="wdi_gdp_usd">GDP, current US$, 1960–2025</option><option value="wdi_gdppc_usd">GDP per capita, current US$, 1960–2025</option><option value="wdi_gdppc_ppp">GDP per capita, PPP, current international $, 1990–2025</option><option value="wdi_gni_pc">GNI per capita, Atlas method, current US$, 1962–2025</option><option value="wdi_growth">GDP growth, annual %, 1961–2025</option><option value="wdi_inflation">Inflation, consumer prices, annual %, 1960–2025</option><option value="wdi_unemployment">Unemployment, % of labour force, 1991–2025</option><option value="wdi_debt">Central government debt, % of GDP, 1970–2024</option><option value="wdi_tax">Tax revenue, % of GDP, 1972–2024</option><option value="wdi_trade">Trade, % of GDP, 1960–2025</option><option value="wdi_remit">Personal remittances received, % of GDP, 1970–2025</option><option value="wdi_gini">Gini index, 1963–2025</option><option value="wdi_poverty">Poverty headcount at $3.00 a day (2021 PPP), % of population, 1963–2025</option><option value="wdi_u5">Under-5 mortality, per 1,000 live births, 1960–2024</option><option value="wdi_health">Current health expenditure, % of GDP, 2000–2024</option><option value="wdi_age65">Population aged 65 and over, % of population, 1960–2025</option><option value="wdi_urban">Urban population, % of total, 1960–2025</option><option value="wdi_internet">Individuals using the Internet, % of population, 1990–2025</option><option value="wdi_water">Safely managed drinking water, % of population, 2000–2024</option><option value="wdi_sanitation">Safely managed sanitation, % of population, 2000–2024</option><option value="wdi_secondary">Secondary school enrolment, % gross, 1970–2025</option><option value="wdi_literacy">Adult literacy rate, % of people aged 15 and over, 1970–2024</option><option value="wdi_female_lfp">Female labour force participation, % of women aged 15 and over, 1990–2025</option><option value="wdi_rd">Research and development expenditure, % of GDP, 1996–2024</option><option value="wdi_homicide">Intentional homicides, per 100,000 people, 1990–2023</option><option value="wdi_forest">Forest area, % of land area, 1990–2024</option><option value="wdi_renewable">Renewable energy, % of final energy consumption, 1990–2022</option><option value="wdi_pm25">PM2.5 air pollution, micrograms per cubic metre, 1990–2023</option><option value="wdi_co2_pc">CO2 emissions excluding land use, tonnes per capita, 1970–2024</option><option value="wdi_ghg">Greenhouse gas emissions excluding land use, thousand tonnes CO2e, 1970–2024</option></optgroup><optgroup label="World Bank – Wealth (Changing Wealth of Nations)"><option value="wdi_cwon_total">Total wealth per capita, current US$, 1995–2020</option><option value="wdi_cwon_human">Human capital wealth per capita, current US$, 1995–2020</option><option value="wdi_cwon_renew">Renewable natural capital per capita, current US$, 1995–2020</option><option value="wdi_cwon_nonrenew">Nonrenewable natural capital per capita, current US$, 1995–2020</option></optgroup><optgroup label="Development and democracy"><option value="hdi">Human Development Index, 1990–2023</option><option value="electdem">Electoral democracy index, 1900–2025</option><option value="regime">Political regime (categories), 1900–2025</option></optgroup></select>
       <input type="file" id="file" accept=".xlsx,.xlsm,.xlsb,.xls,.ods,.csv,.tsv,.txt" hidden>
     </div>
     <div class="note" id="opennote">Excel or CSV, one row for each country. Codes (AU, AUS, 036), short names and formal names are all understood. Your file stays on this computer: nothing is uploaded.</div>
     <div id="loaded" style="display:none">
       <div class="row"><span id="fname"></span></div>
+      <div class="note" id="fsrc"></div>
       <div class="row" id="sheetrow" style="display:none"><label class="lab" for="sheet">Sheet</label><select id="sheet" class="chip"></select></div>
       <div class="row"><label class="lab" for="hdr">Headings</label><select id="hdr" class="chip"></select></div>
       <div class="row"><label class="lab" for="ccol">Countries</label><select id="ccol" class="chip"></select></div>
@@ -242,6 +278,16 @@ body.fold-data.fold-legend #frames{width:min(860px,calc(100% - 60px))}
         <li><a href="https://www.gapminder.org/data/" target="_blank" rel="noopener">Gapminder</a> – long historical series, many back to 1800</li>
       </ul>
       <div class="note">Check each source's terms before you republish its data.</div>
+    </details>
+    <details id="licences">
+      <summary>Sources and licences</summary>
+      <div class="note">Natural Earth boundaries are in the public domain. Each sample is credited in the line under the file name and in the legend. Data are reshaped (selected, put in a table with a column for each year) but not otherwise changed.</div>
+      <ul class="note">
+        <li><b>World Bank</b> (World Development Indicators; The Changing Wealth of Nations 2024): CC BY 4.0, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">licence</a>. The World Bank: World Development Indicators, with the underlying sources named for each series; reshaped here. Indicators found through the search keep the licence the World Bank gives them, shown with the data.</li>
+        <li><b>Our World in Data</b> (population; CO₂, life expectancy, fertility, GDP, electricity, income groups): CC BY 4.0, from the sources shown, as processed by Our World in Data.</li>
+        <li><b>UNDP</b>, Human Development Report 2025 (Human Development Index): CC BY 3.0 IGO, <a href="https://hdr.undp.org/copyright-and-terms-use" target="_blank" rel="noopener">terms</a>; reshaped here.</li>
+        <li><b>V-Dem</b> (electoral democracy index, political regime): Coppedge, Gerring, Knutsen, Lindberg, Teorell and others (2026), "V-Dem Country-Year Dataset v16", Varieties of Democracy Project, <a href="https://doi.org/10.23696/vdemds26" target="_blank" rel="noopener">doi:10.23696/vdemds26</a>. Regimes of the World: Lührmann, Tannenberg and Lindberg (2018), <a href="https://doi.org/10.17645/pag.v6i1.1214" target="_blank" rel="noopener">Politics and Governance 6(1), 60–77</a>. CC BY-SA 4.0, <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">licence</a>. These two files (<code>sample-electdem.js</code>, <code>sample-regime.js</code>) are adapted (a subset, reshaped to a table) and are offered under CC BY-SA 4.0; the rest of this site is not.</li>
+      </ul>
     </details>
   </div>
   <div class="sec" id="colsec" style="display:none">
@@ -271,9 +317,24 @@ body.fold-data.fold-legend #frames{width:min(860px,calc(100% - 60px))}
   <div id="ftrack"><canvas id="fcv"></canvas></div>
   <div id="flabel"></div>
 </div>
+<div id="viewbar" role="group" aria-label="Map view">
+  <div class="seg" id="vmode"><button class="chip on" data-mode="globe">Globe</button><button class="chip" data-mode="flat">Flat map</button></div>
+  <select class="chip" id="vproj" aria-label="Flat map projection" title="Projection of the flat map"><option value="cea">Equal area (rectangular)</option><option value="eq">Equal Earth</option><option value="merc">Mercator</option></select>
+</div>
+<div id="vnote">Mercator enlarges areas towards the poles.</div>
+<div id="wbdlg" role="dialog" aria-modal="true" aria-labelledby="wbtitle">
+  <div id="wbbox">
+    <button id="wbx" aria-label="Close">×</button>
+    <h3 id="wbtitle">Search World Bank indicators</h3>
+    <div class="note">Some 1,500 World Development Indicators. Type words from the name, or the code (SP.POP.TOTL). The data come straight from the World Bank to this page; nothing about you is sent.</div>
+    <input id="wbq" type="search" placeholder="e.g. life expectancy, CO2, SP.DYN.LE00.IN" autocomplete="off" spellcheck="false" aria-label="Search indicators">
+    <div class="note" id="wbstat"></div>
+    <div id="wbres"></div>
+  </div>
+</div>
 <div id="tip"></div>
 <div id="drop">Drop a spreadsheet to map it</div>
-<div id="credit">© 2026 Laurence F. White · Boundaries: Natural Earth · Population and samples: Our World in Data · Colours after ColorBrewer and viridis</div>
+<div id="credit">© 2026 Laurence F. White · Boundaries: Natural Earth · Population and samples: Our World in Data, World Bank, UNDP, V-Dem (see Sources and licences) · Colours after ColorBrewer and viridis</div>
 
 <script src="lib/globe-libs.js"></script>
 <script src="lib/globe-gl.js"></script>
@@ -284,6 +345,8 @@ body.fold-data.fold-legend #frames{width:min(860px,calc(100% - 60px))}
 (function () {
 'use strict';
 var DEG = Math.PI / 180;
+/* the room the two side panels take on a wide screen: data 16 + 368 + gap, legend 300 + 16 + gap */
+var PANELS_W = 750;
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 function unitv(ll) { var l = ll[0] * DEG, p = ll[1] * DEG, cp = Math.cos(p); return [cp * Math.cos(l), cp * Math.sin(l), Math.sin(p)]; }
@@ -577,8 +640,8 @@ function numVal(ch, raw, item, F) {
 /* the units a column is counted in, from its heading or the file's name */
 function unitOf(t) {
   t = String(t).toLowerCase();
-  if (/\bbillions?\b|\bbn\b|\$ ?bn?\b/.test(t)) return 1e9;
-  if (/\bmillions?\b|\bmn\b|\bmln\b|\(m\)|\$ ?m\b/.test(t)) return 1e6;
+  if (/\bbillions?\b|\bbn\b|\$ ?bn?\b|\bgt\b/.test(t)) return 1e9;
+  if (/\bmillions?\b|\bmn\b|\bmln\b|\(m\)|\$ ?m\b|\bmt\b/.test(t)) return 1e6;
   if (/\bthousands?\b|'000|\(k\)|\bkt\b/.test(t)) return 1e3;
   return 1;
 }
@@ -590,6 +653,7 @@ function baseUnit(t) {
   if (m && !/^(of|and|the|in|people|persons|inhabitants)$/i.test(m[1])) return m[1].toLowerCase() === 'dollars' ? '$' : m[1];
   m = /((?:US|A|NZ|C)?\$|€|£|¥)\s*(?:thousands?|millions?|billions?|bn|mn|m|k)\b/i.exec(t) || /\b(?:thousands?|millions?|billions?)\s+((?:US|A|NZ|C)?\$|€|£|¥)/i.exec(t);
   if (m) return m[1];
+  if (/\b(?:kt|mt|gt)\b/i.test(t)) return 'tonnes';
   m = /\b(tonnes|tons|kg|kilograms|litres|liters|barrels|kwh|mwh|gwh|twh|hectares|km²|dollars|euros|pounds|yen|people|deaths|cases)\b/i.exec(t);
   return m && !/^(people)$/i.test(m[1]) ? m[1] : '';
 }
@@ -612,8 +676,8 @@ var S = {
   opts: {}, custom: {}, rowOf: [], frames: [], dupes: 0, matched: 0, unmatched: [], groups: 0
 };
 
-function loadWorkbook(wb, name) {
-  S.wb = wb; S.name = name; S.manual = {}; S.custom = {}; S.opts = {}; S.pc = {};
+function loadWorkbook(wb, name, src) {
+  S.wb = wb; S.name = name; S.src = src || null; S.manual = {}; S.custom = {}; S.opts = {}; S.pc = {};
   /* the sheet with the most filled cells */
   var best = wb.SheetNames[0], most = -1;
   wb.SheetNames.forEach(function (n) {
@@ -993,6 +1057,10 @@ function defaultOpts(ch, vals, kind) {
 /* where a category sits from low to high, if its name says so: low, lower-middle, middle, upper-middle, high */
 function ordRank(s) {
   s = String(s).toLowerCase();
+  if (/\bclosed autocracy\b/.test(s)) return 10;
+  if (/\belectoral autocracy\b/.test(s)) return 11;
+  if (/\belectoral democracy\b/.test(s)) return 12;
+  if (/\bliberal democracy\b/.test(s)) return 13;
   if (/\bvery high\b/.test(s)) return 6;
   if (/\bupper[\s-]*middle\b/.test(s)) return 4;
   if (/\blower[\s-]*middle\b/.test(s)) return 2;
@@ -1153,9 +1221,58 @@ glUpload();
 if (GL) glCv.addEventListener('webglcontextlost', function (e) { e.preventDefault(); GL = null; SET = BORDERS = null; scheduleDraw(); });
 var W = 1, H = 1, DPR = 1, R0 = 1, CX = 0, CY = 0, narrow = false;
 var rotation = [-20, -15], zoom = 1;
-var projection = d3.geoOrthographic().clipAngle(90).precision(0.4);
+var PROJ = { globe: d3.geoOrthographic().clipAngle(90).precision(0.4), eq: d3.geoEqualEarth().precision(0.5), merc: d3.geoMercator().precision(0.5), cea: GlobeGL.d3CylindricalEqualArea(30).precision(0.5) };
+var PARALLEL = 30;
+var projection = PROJ.globe;
 var path = d3.geoPath(projection, ctx);
 var FX = [0, 0, 0], FY = [0, 0, 0], viewV = [1, 0, 0];
+
+/* ------------------------------------------------------------ the flat map: one place for what differs from the globe */
+var autoFill = true, VIEW = { flat: false, proj: 'eq' }, projExplicit = false, flon = 10, fLat = 15, fz = 1, AVW = 1, AVH = 1, MAXLAT = 80, UNITS = {};
+function wrapLon(x) { return ((x + 180) % 360 + 360) % 360 - 180; }
+function projUnit(k) {
+  if (!UNITS[k]) {
+    var p = k === 'eq' ? d3.geoEqualEarth() : k === 'cea' ? GlobeGL.d3CylindricalEqualArea(PARALLEL) : d3.geoMercator(), lm = k === 'merc' ? MAXLAT : 90;
+    p.scale(1).translate([0, 0]).rotate([0, 0]).center([0, 0]).clipExtent(null);
+    UNITS[k] = { p: p, lm: lm, w: p([179.9999, 0])[0] - p([-179.9999, 0])[0], yMax: Math.abs(p([0, -lm])[1] - p([0, lm])[1]) / 2 };
+    UNITS[k].yFit = UNITS[k].yMax;
+  }
+  return UNITS[k];
+}
+function latToY(lat) { var U = projUnit(VIEW.proj); return U.p([0, clamp(lat, -U.lm, U.lm)])[1]; }
+function yToLat(y) { var U = projUnit(VIEW.proj), ll = U.p.invert([0, clamp(y, -U.yMax, U.yMax)]); return ll ? clamp(ll[1], -U.lm, U.lm) : 0; }
+function kxAt(lat) { var p = projUnit(VIEW.proj).p; return Math.max(1e-3, p([1, lat])[0] - p([0, lat])[0]); }
+function fitScale() { var U = projUnit(VIEW.proj); return Math.min(AVW * 0.96 / U.w, AVH * 0.96 / (2 * U.yFit)); }
+function fScale() { return fitScale() * fz; }
+function fzFill() { var U = projUnit(VIEW.proj); return Math.max(1, AVH * 0.96 / (2 * U.yFit) / fitScale()); }
+/* the view centre may go as far as puts a pole at the edge of the window (not just of the free space), so zoomed in the map reaches the poles; at the fit it stays centred */
+function winHalfH(s) { return AVH / 2; }
+function clampY(c, s) { var ym = projUnit(VIEW.proj).yMax, hh = winHalfH(s); return clamp(c, Math.min(0, -ym + hh / s), Math.max(0, ym - hh / s)); }
+/* the map window: in flat mode nothing of the map is drawn or answers the pointer outside it. It is the free space between the panels, the card and the scrubber. Mercator is drawn to 80N and 80S and fits whole at zoom 1 */
+function winRect() {
+  if (!VIEW.flat) return null;
+  var hw = AVW / 2, hh = winHalfH(fScale());
+  return { x0: CX - hw, x1: CX + hw, y0: CY - hh, y1: CY + hh };
+}
+function inWin(x, y) { var w = winRect(); return !w || (x >= w.x0 && x <= w.x1 && y >= w.y0 && y <= w.y1); }
+function pxToLL(x, y) {
+  var s = fScale(), lat = yToLat(latToY(fLat) + (y - CY) / s);
+  return [wrapLon(flon + (x - CX) / (s * kxAt(lat))), lat];
+}
+/* put the place P under the screen point (x, y) at the current zoom */
+function anchor(P, x, y) {
+  var s = fScale();
+  fLat = yToLat(clampY(latToY(P[1]) - (y - CY) / s, s));
+  flon = wrapLon(P[0] - (x - CX) / (s * kxAt(P[1])));
+}
+function flatOutline() {
+  if (VIEW.proj === 'eq') { path({ type: 'Sphere' }); return; }
+  var U = projUnit(VIEW.proj), s = projection.scale(), y0 = projection([flon, U.lm])[1], y1 = projection([flon, -U.lm])[1];
+  ctx.rect(CX - s * U.w / 2, y0, s * U.w, y1 - y0);
+}
+var graticuleM = d3.geoGraticule().extent([[-180, -MAXLAT], [180, MAXLAT]]).step([30, 30])();
+function dotsOn() { return VIEW.flat ? fz < 4 : zoom < 5; }
+function dotFacing(it) { return VIEW.flat || it.labV[0] * viewV[0] + it.labV[1] * viewV[1] + it.labV[2] * viewV[2] >= 0.05; }
 var borderGeo = { type: 'MultiLineString', coordinates: [] };
 ITEMS.forEach(function (it) { it.lines.forEach(function (l) { borderGeo.coordinates.push(l); }); });
 var graticule = d3.geoGraticule().step([30, 30])();
@@ -1163,33 +1280,113 @@ var graticule = d3.geoGraticule().step([30, 30])();
 function resize() {
   W = window.innerWidth; H = window.innerHeight; DPR = Math.min(window.devicePixelRatio || 1, 2);
   narrow = W <= 900;
+  if (!projExplicit) { var dp = defaultProj(); if (VIEW.proj !== dp) { VIEW.proj = dp; document.getElementById('vproj').value = dp; if (dp === 'merc' && fz <= 1.0001) fLat = 0; } }
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   if (GL) GL.resize(W, H, DPR); else { glCv.width = 1; glCv.height = 1; }
-  var left = narrow || FOLD.data ? 0 : 350, right = narrow || FOLD.legend ? 0 : 330, bottom = S.frames.length > 1 && !narrow ? 70 : 0;
-  var top = narrow && !FOLD.legend ? H * 0.28 + 56 : narrow ? 48 : 0, low = narrow && !FOLD.data ? H * 0.42 + 16 : narrow ? 48 : 0;
-  CX = left + (W - left - right) / 2; CY = top + (H - top - low - bottom) / 2 + (narrow ? 0 : 10);
-  R0 = Math.max(70, Math.min((W - left - right) * 0.46, (H - top - low - bottom) * 0.44));
+  relayout(false);
+}
+function defaultProj() { return window.innerWidth >= PANELS_W + 700 ? 'eq' : 'merc'; }
+/* the free space for the map is what the open panels, the time scrubber and the card actually leave, measured */
+function rectOf(id) { var e = document.getElementById(id); if (!e || !e.getClientRects().length) return null; var r = e.getBoundingClientRect(); return r.width && r.height ? r : null; }
+var LT = null, layAnim = null, GAP = 12;
+function layoutTarget() {
+  var d = rectOf('data'), l = rectOf('legend'), c = narrow ? null : rectOf('card'), fr = document.getElementById('frames'), f = null;
+  if (!narrow) {
+    var fx0 = d ? d.right + 16 : 16, fx1 = l ? l.left - 16 : W - 16;
+    fr.style.left = (fx0 + fx1) / 2 + 'px'; fr.style.width = Math.max(0, Math.min(860, fx1 - fx0)) + 'px';
+  } else { fr.style.left = ''; fr.style.width = ''; }
+  if (S.frames.length > 1) f = rectOf('frames');
+  var L = 0, R = W, T = 0, B = H, barTop = 0;
+  if (!narrow) {
+    if (d) L = d.right + GAP;
+    if (l) R = Math.min(R, l.left - GAP);
+    if (c) R = Math.min(R, c.left - GAP);
+    if (f) B = f.top - GAP;
+    /* on the flat map the view bar and its pill sit in the top-left corner: keep the map clear of them when the window is too short for the slack to do it */
+    if (VIEW.flat) {
+      var U = projUnit(VIEW.proj), mh = Math.min((R - L) * 0.96 / U.w * 2 * U.yFit, (B - T) * 0.96);
+      if ((B - T - mh) / 2 < 112) { T = 112; B = Math.min(B, H - 20); }
+    }
+  } else {
+    barTop = l ? l.bottom + 6 : 48;
+    var vn = document.getElementById('vnote');
+    if (VIEW.flat && VIEW.proj === 'merc') { vn.style.display = 'block'; vn.style.maxWidth = (W - 16) + 'px'; T = barTop + 42 + vn.offsetHeight + 4; }
+    else T = barTop + 36;
+    B = d ? d.top - GAP : H - 48;
+    if (f) B = Math.min(B, f.top - GAP);
+  }
+  var aw = Math.max(R - L, 160), ah = Math.max(B - T, 160);
+  return { CX: (L + R) / 2, CY: (T + B) / 2, AVW: aw, AVH: ah, R0: Math.max(70, Math.min(aw * 0.46, ah * 0.44)), barTop: barTop };
+}
+function sameLayout(a, b) { return ['CX', 'CY', 'AVW', 'AVH', 'R0', 'barTop'].every(function (k) { return Math.abs(a[k] - b[k]) < 6; }); }
+function applyLayout(t) {
+  CX = t.CX; CY = t.CY; AVW = t.AVW; AVH = t.AVH; R0 = t.R0;
+  if (VIEW.flat && autoFill && narrow && H > W) fz = fzFill();
+  layoutBar(t.barTop);
+}
+function relayout(animate) {
+  syncFold();
+  var t = layoutTarget();
+  if (LT && sameLayout(LT, t)) layoutBar(t.barTop);
+  else if (LT && animate) { layAnim = { from: { CX: CX, CY: CY, AVW: AVW, AVH: AVH, R0: R0 }, to: t, t0: 0 }; LT = t; }
+  else { LT = t; layAnim = null; applyLayout(t); }
   if (S.frames.length > 1) requestAnimationFrame(drawScrubber);
   scheduleDraw();
 }
+function stepLayout(now) {
+  if (!layAnim) return false;
+  if (!layAnim.t0) layAnim.t0 = now;
+  var u = Math.min(1, (now - layAnim.t0) / 240), e = 1 - Math.pow(1 - u, 3), a = layAnim.from, b = layAnim.to, o = { barTop: b.barTop };
+  ['CX', 'CY', 'AVW', 'AVH', 'R0'].forEach(function (k) { o[k] = a[k] + (b[k] - a[k]) * e; });
+  applyLayout(o);
+  if (u >= 1) layAnim = null;
+  return u < 1;
+}
+function layoutBar(barTop) {
+  var vb = document.getElementById('viewbar'), vn = document.getElementById('vnote'), td = document.getElementById('tab-data');
+  vn.style.display = VIEW.flat && VIEW.proj === 'merc' ? 'block' : 'none';
+  if (narrow) {
+    vb.style.left = Math.max(8, CX - vb.offsetWidth / 2) + 'px'; vb.style.top = (barTop + 4) + 'px';
+    vn.style.top = (barTop + 42) + 'px'; vn.style.maxWidth = (W - 16) + 'px';
+    td.style.left = ''; td.style.top = '';
+  } else {
+    vb.style.left = '16px'; vb.style.top = '76px'; vn.style.top = '14px'; vn.style.maxWidth = '340px';
+    td.style.left = (16 + vb.offsetWidth + 8) + 'px'; td.style.top = '74px';
+  }
+  vn.style.left = CX + 'px';
+}
 function applyProjection() {
+  if (VIEW.flat) {
+    projection = PROJ[VIEW.proj]; path.projection(projection);
+    var fs = fScale();
+    fLat = yToLat(clampY(latToY(fLat), fs));
+    projection.scale(fs).rotate([-flon, 0]).center([0, fLat]).translate([CX, CY]).clipExtent([[-30, -30], [W + 30, H + 30]]);
+    return;
+  }
+  projection = PROJ.globe; path.projection(projection);
   projection.scale(R0 * zoom).translate([CX, CY]).rotate(rotation);
   var r = R0 * zoom, dl = rotation[0] * DEG, dp = rotation[1] * DEG;
   FX = [r * Math.sin(dl), r * Math.cos(dl), 0];
   FY = [-r * Math.sin(dp) * Math.cos(dl), r * Math.sin(dp) * Math.sin(dl), -r * Math.cos(dp)];
   viewV = unitv([-rotation[0], -rotation[1]]);
 }
-var PAL = { ocean0: '#123050', ocean1: '#050e1d', border: 'rgba(8,12,22,.62)', borderNo: 'rgba(150,170,200,.18)', rim: 'rgba(150,205,255,.40)', grid: 'rgba(190,215,240,.10)' };
-var GLC = GL ? { ocean0: GlobeGL.rgba(PAL.ocean0).slice(0, 3), ocean1: GlobeGL.rgba(PAL.ocean1).slice(0, 3), border: GlobeGL.rgba(PAL.border) } : null;
+var PAL = { ocean0: '#123050', ocean1: '#050e1d', border: 'rgba(8,12,22,.62)', borderNo: 'rgba(150,170,200,.18)', rim: 'rgba(150,205,255,.40)', grid: 'rgba(190,215,240,.10)', oceanFlat: '#0b2240', rimFlat: 'rgba(150,205,255,.35)' };
+var GLC = GL ? { ocean0: GlobeGL.rgba(PAL.ocean0).slice(0, 3), ocean1: GlobeGL.rgba(PAL.ocean1).slice(0, 3), border: GlobeGL.rgba(PAL.border), oceanFlat: GlobeGL.rgba(PAL.oceanFlat).slice(0, 3) } : null;
 
 var drawPending = false, lastDrawMs = 0;
 function scheduleDraw() { if (!drawPending) { drawPending = true; requestAnimationFrame(frame); } }
-function frame(t) { drawPending = false; var more = stepFly(t); more = stepSpin(t) || more; if (playing) more = stepPlay(t) || more; draw(); if (more) scheduleDraw(); }
+function frame(t) { drawPending = false; var more = stepLayout(t); more = stepFly(t) || more; more = stepSpin(t) || more; if (playing) more = stepPlay(t) || more; draw(); if (more) scheduleDraw(); }
 /* the globe runs on after a flick and slows to a stop */
 var spin = null, trail = [];
 function stepSpin(now) {
   if (!spin || drag || fly) { spin = null; return false; }
   var dt = Math.min(50, now - spin.last); spin.last = now;
+  if (VIEW.flat) {
+    anchor(pxToLL(CX, CY), CX + spin.vx * dt, CY + spin.vy * dt);
+    var df = Math.exp(-dt / 480); spin.vx *= df; spin.vy *= df;
+    if (Math.hypot(spin.vx, spin.vy) < 0.01) { spin = null; updateHash(); return false; }
+    return true;
+  }
   rotation = [rotation[0] + spin.vl * dt, clamp(rotation[1] + spin.vp * dt, -90, 90)];
   var d = Math.exp(-dt / 480); spin.vl *= d; spin.vp *= d;
   if (Math.hypot(spin.vl, spin.vp) < 0.003) { spin = null; updateHash(); return false; }
@@ -1199,7 +1396,7 @@ function foldable(it) {
   var lim = Math.PI - 0.09 - it.capR;
   return lim > 0 && it.cap[0] * viewV[0] + it.cap[1] * viewV[1] + it.cap[2] * viewV[2] > Math.cos(lim);
 }
-function visibleCap(it) { return it.cap[0] * viewV[0] + it.cap[1] * viewV[1] + it.cap[2] * viewV[2] > -Math.sin(Math.min(Math.PI / 2, it.capR)) - 0.01; }
+function visibleCap(it) { return VIEW.flat || it.cap[0] * viewV[0] + it.cap[1] * viewV[1] + it.cap[2] * viewV[2] > -Math.sin(Math.min(Math.PI / 2, it.capR)) - 0.01; }
 var clipRings = GL ? GlobeGL.ringCollector() : null, clipPath = GL ? d3.geoPath(projection, clipRings) : null;
 var hl = null, hoverItem = null, SEL = [];
 /* select a country (its owner, so a territory drawn apart selects its country); add toggles it in a selection */
@@ -1215,20 +1412,90 @@ function fillOf(it) {
   return f;
 }
 function mix(a, b, u) { var x = d3.rgb(a), y = d3.rgb(b); return d3.rgb(x.r + (y.r - x.r) * u, x.g + (y.g - x.g) * u, x.b + (y.b - x.b) * u).formatHex(); }
+function drawFlatBase(groups) {
+  ctx.fillStyle = PAL.oceanFlat; ctx.fill();
+  ctx.clip();
+  Object.keys(groups).forEach(function (c) {
+    ctx.beginPath();
+    groups[c].forEach(function (k) { path(ITEMS[k].geo); });
+    ctx.fillStyle = c; ctx.fill('evenodd');
+  });
+  ctx.beginPath(); path(borderGeo); ctx.strokeStyle = PAL.border; ctx.lineWidth = 0.6; ctx.stroke();
+}
+var hcv = document.createElement('canvas'), hctx = hcv.getContext('2d'), hkey = '';
+var gpuHat = null;
+function hatchInto(c, pth) {
+  for (var i = 0; i < ITEMS.length; i++) {
+    var L = LOOK[i], it = ITEMS[i];
+    if (!L || !L.hatch || it.small || !visibleCap(it) || (gpuHat && gpuHat[i])) continue;
+    if (hl && L.k[hl.ch] !== hl.k) continue;
+    c.beginPath(); pth(it.geo); c.fillStyle = pattern(L.hatch); c.fill('evenodd');
+  }
+}
+var hLook = null;
+/* hatching on the GPU: the hatched countries grouped by pattern, one pass each; marks the ones drawn in done (an
+   index set) and returns false if the card cannot */
+function glHatch(ok, done) {
+  var by = {}, any = false;
+  for (var i = 0; i < ITEMS.length; i++) {
+    var L = LOOK[i], it = ITEMS[i];
+    if (!L || !L.hatch || it.small || !ok(i)) continue;
+    if (hl && L.k[hl.ch] !== hl.k) continue;
+    (by[L.hatch] = by[L.hatch] || []).push(i);
+  }
+  var keys = Object.keys(by);
+  for (var j = 0; j < keys.length; j++) {
+    var p = keys[j].split(':');
+    if (!GL.fillPattern(SET, by[keys[j]], { kind: p[0], spacing: +p[1] || 9, ink: p[2] || 'both' })) return false;
+    if (done) by[keys[j]].forEach(function (k) { done[k] = 1; });
+  }
+  return true;
+}
+function flatHatchLayer() {
+  if (gpuHat === 'all') return;
+  var key = [flon, fLat, fz, VIEW.proj, W, H, DPR, hl ? hl.ch + '|' + hl.k : ''].join(',');
+  if (key === hkey && hLook === LOOK) return;
+  hkey = key; hLook = LOOK;
+  if (hcv.width !== cv.width || hcv.height !== cv.height) { hcv.width = cv.width; hcv.height = cv.height; }
+  hctx.setTransform(DPR, 0, 0, DPR, 0, 0); hctx.clearRect(0, 0, W, H);
+  hctx.save(); hctx.beginPath();
+  if (VIEW.proj === 'eq') d3.geoPath(projection, hctx)({ type: 'Sphere' });
+  else { var U = projUnit(VIEW.proj), sc = projection.scale(); hctx.rect(CX - sc * U.w / 2, projection([flon, U.lm])[1], sc * U.w, projection([flon, -U.lm])[1] - projection([flon, U.lm])[1]); }
+  hctx.clip();
+  hatchInto(hctx, d3.geoPath(projection, hctx));
+  hctx.restore();
+}
 function draw() {
   var t0 = performance.now();
   applyProjection();
-  if (!GL) projection.precision(drag || pinch || fly ? 2 : 0.4);
+  if (VIEW.flat || !GL) projection.precision(drag || pinch || fly || (VIEW.flat && spin) ? 2 : 0.4);
   var r = R0 * zoom, cx = CX, cy = CY, i;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0, 0, W, H);
+  var win = winRect();
+  glCv.style.clipPath = win ? 'inset(' + win.y0.toFixed(1) + 'px ' + (W - win.x1).toFixed(1) + 'px ' + (H - win.y1).toFixed(1) + 'px ' + win.x0.toFixed(1) + 'px)' : '';
+  if (win) { ctx.save(); ctx.beginPath(); ctx.rect(win.x0, win.y0, win.x1 - win.x0, win.y1 - win.y0); ctx.clip(); }
   var ag = ctx.createRadialGradient(cx, cy, r * 0.985, cx, cy, r * 1.17);
   ag.addColorStop(0, 'rgba(112,176,255,.26)'); ag.addColorStop(0.35, 'rgba(90,150,235,.09)'); ag.addColorStop(1, 'rgba(70,130,220,0)');
-  ctx.fillStyle = ag; ctx.beginPath(); ctx.arc(cx, cy, r * 1.17, 0, 2 * Math.PI); ctx.arc(cx, cy, r * 0.985, 0, 2 * Math.PI, true); ctx.fill();
+  if (!VIEW.flat) { ctx.fillStyle = ag; ctx.beginPath(); ctx.arc(cx, cy, r * 1.17, 0, 2 * Math.PI); ctx.arc(cx, cy, r * 0.985, 0, 2 * Math.PI, true); ctx.fill(); }
   var gr = Math.min(r * 1.05, Math.hypot(W, H) * 0.7);
   var groups = {};
   for (i = 0; i < ITEMS.length; i++) { var f = fillOf(ITEMS[i]); (groups[f] = groups[f] || []).push(i); }
-  if (GL) {
+  var flatGL = false;
+  gpuHat = null;
+  if (VIEW.flat && GL && SET) {
+    var o0 = projection([flon, 0]), kind = VIEW.proj === 'merc' ? 'mercator' : VIEW.proj === 'cea' ? 'cylindricalEqualArea' : 'equalEarth';
+    flatGL = GL.frameFlat({ kind: kind, centreLon: flon, scale: projection.scale(), tx: o0[0], ty: o0[1], latClamp: MAXLAT, parallel: PARALLEL });
+    if (flatGL) {
+      GL.ocean(GLC.oceanFlat, GLC.oceanFlat, 0, 0, 0, 0, 0, 1, null, null);
+      Object.keys(groups).forEach(function (c) { GL.fillMany(SET, groups[c], GlobeGL.rgba(c)); });
+      GL.drawLines(BORDERS, GLC.border);
+      gpuHat = glHatch(function () { return true; }) ? 'all' : null;
+    }
+  }
+  glCv.style.visibility = VIEW.flat && !flatGL ? 'hidden' : '';
+  if (VIEW.flat) { /* the map is drawn above, or below on the 2D path */ }
+  else if (GL) {
     GL.frame(FX, FY, cx, cy, r, viewV);
     GL.ocean(GLC.ocean0, GLC.ocean1, cx - gr * 0.28, cy - gr * 0.32, gr * 0.06, cx, cy, gr, null);
     Object.keys(groups).forEach(function (c) {
@@ -1242,6 +1509,8 @@ function draw() {
       GL.fillMany(SET, fold, col);
     });
     GL.drawLines(BORDERS, GLC.border);
+    gpuHat = {};
+    glHatch(function (k) { var it = ITEMS[k]; return visibleCap(it) && foldable(it); }, gpuHat);
   } else {
     ctx.beginPath(); path({ type: 'Sphere' });
     var og = ctx.createRadialGradient(cx - gr * 0.28, cy - gr * 0.32, gr * 0.06, cx, cy, gr);
@@ -1253,36 +1522,49 @@ function draw() {
     });
     ctx.beginPath(); path(borderGeo); ctx.strokeStyle = PAL.border; ctx.lineWidth = 0.6; ctx.stroke();
   }
-  ctx.beginPath(); path(graticule); ctx.strokeStyle = PAL.grid; ctx.lineWidth = 0.6; ctx.stroke();
-  /* hatching on the canvas, in screen space so it reads the same everywhere */
-  for (i = 0; i < ITEMS.length; i++) {
-    var L = LOOK[i], it = ITEMS[i];
-    if (!L || !L.hatch || it.small || !visibleCap(it)) continue;
-    if (hl && L.k[hl.ch] !== hl.k) continue;
-    ctx.beginPath(); path(it.geo); ctx.fillStyle = pattern(L.hatch); ctx.fill('evenodd');
+  function overlay() {
+    var i, L, it, p, rad;
+    ctx.beginPath(); path(VIEW.flat && VIEW.proj === 'merc' ? graticuleM : graticule); ctx.strokeStyle = PAL.grid; ctx.lineWidth = 0.6; ctx.stroke();
+    /* hatching on the canvas, in screen space so it reads the same everywhere; on the flat map it is drawn once
+       and kept while the view, the data and the highlight stay as they are */
+    if (VIEW.flat) { if (gpuHat !== 'all') ctx.drawImage(hcv, 0, 0, W, H); }
+    else hatchInto(ctx, path);
+    /* small countries as dots, so they are not lost */
+    if (dotsOn()) for (i = 0; i < ITEMS.length; i++) {
+      it = ITEMS[i];
+      if (!it.small || OWNER[i] !== i) continue;
+      if (!dotFacing(it)) continue;
+      var p = projection(it.lab), rad = 3.4;
+      if (!p) continue;
+      ctx.beginPath(); ctx.arc(p[0], p[1], rad, 0, 2 * Math.PI);
+      ctx.fillStyle = fillOf(it); ctx.fill();
+      L = LOOK[i];
+      if (L && L.hatch && !(hl && L.k[hl.ch] !== hl.k)) { ctx.lineWidth = 1.6; ctx.strokeStyle = '#ffffff'; ctx.stroke(); }
+      ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(6,10,18,.85)'; ctx.stroke();
+    }
+    if (SEL.length) {
+      ctx.beginPath();
+      for (i = 0; i < ITEMS.length; i++) if (SEL.indexOf(OWNER[i]) >= 0 && visibleCap(ITEMS[i])) path(ITEMS[i].geo);
+      ctx.strokeStyle = 'rgba(6,10,18,.9)'; ctx.lineWidth = 3.4; ctx.stroke();
+      ctx.strokeStyle = '#8ed0ff'; ctx.lineWidth = 1.8; ctx.stroke();
+    }
+    if (hoverItem != null) { ctx.beginPath(); path(ITEMS[hoverItem].geo); ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 1.4; ctx.stroke(); }
   }
-  /* small countries as dots, so they are not lost */
-  if (zoom < 5) for (i = 0; i < ITEMS.length; i++) {
-    it = ITEMS[i];
-    if (!it.small || OWNER[i] !== i) continue;
-    var d = it.labV[0] * viewV[0] + it.labV[1] * viewV[1] + it.labV[2] * viewV[2];
-    if (d < 0.05) continue;
-    var p = projection(it.lab), rad = 3.4;
-    if (!p) continue;
-    ctx.beginPath(); ctx.arc(p[0], p[1], rad, 0, 2 * Math.PI);
-    ctx.fillStyle = fillOf(it); ctx.fill();
-    L = LOOK[i];
-    if (L && L.hatch && !(hl && L.k[hl.ch] !== hl.k)) { ctx.lineWidth = 1.6; ctx.strokeStyle = '#ffffff'; ctx.stroke(); }
-    ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(6,10,18,.85)'; ctx.stroke();
+  if (VIEW.flat) flatHatchLayer();
+  if (VIEW.flat) {
+    ctx.save();
+    ctx.beginPath(); flatOutline();
+    if (flatGL) ctx.clip(); else drawFlatBase(groups);
   }
-  if (SEL.length) {
-    ctx.beginPath();
-    for (i = 0; i < ITEMS.length; i++) if (SEL.indexOf(OWNER[i]) >= 0 && visibleCap(ITEMS[i])) path(ITEMS[i].geo);
-    ctx.strokeStyle = 'rgba(6,10,18,.9)'; ctx.lineWidth = 3.4; ctx.stroke();
-    ctx.strokeStyle = '#8ed0ff'; ctx.lineWidth = 1.8; ctx.stroke();
+  overlay();
+  if (VIEW.flat) {
+    ctx.restore(); ctx.save(); ctx.beginPath(); flatOutline(); ctx.lineWidth = 1; ctx.strokeStyle = PAL.rimFlat; ctx.stroke(); ctx.restore();
+  } else { ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.lineWidth = 1; ctx.strokeStyle = PAL.rim; ctx.stroke(); }
+  if (VIEW.flat) projection.clipExtent([[-30, -30], [W + 30, H + 30]]);
+  if (win) {
+    ctx.restore();
+    if (fz > 1.001) { ctx.strokeStyle = 'rgba(150,205,255,.16)'; ctx.lineWidth = 1; ctx.strokeRect(win.x0 + 0.5, win.y0 + 0.5, win.x1 - win.x0 - 1, win.y1 - win.y0 - 1); }
   }
-  if (hoverItem != null) { ctx.beginPath(); path(ITEMS[hoverItem].geo); ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 1.4; ctx.stroke(); }
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.lineWidth = 1; ctx.strokeStyle = PAL.rim; ctx.stroke();
   lastDrawMs = performance.now() - t0;
 }
 
@@ -1295,6 +1577,8 @@ function refresh() {
   document.getElementById('loaded').style.display = '';
   document.getElementById('colsec').style.display = '';
   document.getElementById('fname').textContent = S.name;
+  var fs = document.getElementById('fsrc');
+  fs.textContent = S.src ? S.src.text : ''; fs.classList.toggle('warn', !!(S.src && S.src.warn));
   renderStatus(); renderCols(); renderOpts(); renderStep(); renderFrames(); renderLegend(); renderCard();
   resize();
 }
@@ -1579,6 +1863,7 @@ function renderLegend() {
   var title = SC.colour ? (many ? F.label : SC.colour.col.name) : SC.shade ? SC.shade.col.name : SC.hatch.col.name;
   var sub = S.step != null ? (timeAxis() ? F.label : colByI(S.step).name + ' ' + F.label) : many ? (timeAxis() ? S.name : 'Step ' + (S.frame + 1) + ' of ' + S.frames.length) : S.name;
   html += '<div class="ttl">' + esc(title) + '</div><div class="sub">' + esc(sub) + '</div>';
+  if (S.src) html += '<div class="src' + (S.src.warn ? ' warn' : '') + '">' + esc(S.src.text) + '</div>';
   ['colour', 'shade', 'hatch'].forEach(function (ch) {
     var sc = SC[ch];
     if (!sc) return;
@@ -1778,7 +2063,7 @@ function openFile(file) {
   rd.onerror = function () { showError('That file could not be read.'); };
   if (text) rd.readAsText(file); else rd.readAsArrayBuffer(file);
 }
-function loadText(text, name) { SEL = []; loadWorkbook(XLSX.read(text, { type: 'string', raw: true }), name || 'table.csv'); }
+function loadText(text, name, src) { SEL = []; loadWorkbook(XLSX.read(text, { type: 'string', raw: true }), name || 'table.csv', src); }
 document.getElementById('openbtn').addEventListener('click', function () { document.getElementById('file').click(); });
 document.getElementById('file').addEventListener('change', function (e) { openFile(e.target.files[0]); e.target.value = ''; });
 function loadScript(src, done) {
@@ -1793,15 +2078,64 @@ var SAMPLES = {
   fertility: ['DV_SAMPLE_FERTILITY', 'data/sample-fertility.js', 'Sample: children born per woman (Human Fertility Database and UN WPP, via Our World in Data)'],
   gdp: ['DV_SAMPLE_GDP', 'data/sample-gdp.js', 'Sample: GDP per person, international-$ at 2021 prices, PPP (World Bank, via Our World in Data)'],
   electricity: ['DV_SAMPLE_ELECTRICITY', 'data/sample-electricity.js', 'Sample: share of the population with access to electricity, % (World Bank, via Our World in Data)'],
-  income: ['DV_SAMPLE_INCOME', 'data/sample-income.js', 'Sample: World Bank income groups by year (World Bank, via Our World in Data)']
+  income: ['DV_SAMPLE_INCOME', 'data/sample-income.js', 'Sample: World Bank income groups by year (World Bank, via Our World in Data)'],
+  wdi_pop: ['DV_SAMPLE_WDI_POP', 'data/sample-wdi_pop.js', 'Sample: Population, total (people) (World Bank, World Development Indicators SP.POP.TOTL)'],
+  wdi_gdp_usd: ['DV_SAMPLE_WDI_GDP_USD', 'data/sample-wdi_gdp_usd.js', 'Sample: GDP, current US$ (World Bank, World Development Indicators NY.GDP.MKTP.CD)'],
+  wdi_gdppc_usd: ['DV_SAMPLE_WDI_GDPPC_USD', 'data/sample-wdi_gdppc_usd.js', 'Sample: GDP per capita, current US$ (World Bank, World Development Indicators NY.GDP.PCAP.CD)'],
+  wdi_gdppc_ppp: ['DV_SAMPLE_WDI_GDPPC_PPP', 'data/sample-wdi_gdppc_ppp.js', 'Sample: GDP per capita, PPP, current international $ (World Bank, World Development Indicators NY.GDP.PCAP.PP.CD)'],
+  wdi_gni_pc: ['DV_SAMPLE_WDI_GNI_PC', 'data/sample-wdi_gni_pc.js', 'Sample: GNI per capita, Atlas method, current US$ (World Bank, World Development Indicators NY.GNP.PCAP.CD)'],
+  wdi_growth: ['DV_SAMPLE_WDI_GROWTH', 'data/sample-wdi_growth.js', 'Sample: GDP growth, annual % (World Bank, World Development Indicators NY.GDP.MKTP.KD.ZG)'],
+  wdi_inflation: ['DV_SAMPLE_WDI_INFLATION', 'data/sample-wdi_inflation.js', 'Sample: Inflation, consumer prices, annual % (World Bank, World Development Indicators FP.CPI.TOTL.ZG)'],
+  wdi_unemployment: ['DV_SAMPLE_WDI_UNEMPLOYMENT', 'data/sample-wdi_unemployment.js', 'Sample: Unemployment, % of labour force (modelled ILO estimate) (World Bank, World Development Indicators SL.UEM.TOTL.ZS)'],
+  wdi_debt: ['DV_SAMPLE_WDI_DEBT', 'data/sample-wdi_debt.js', 'Sample: Central government debt, % of GDP (World Bank, World Development Indicators GC.DOD.TOTL.GD.ZS)'],
+  wdi_tax: ['DV_SAMPLE_WDI_TAX', 'data/sample-wdi_tax.js', 'Sample: Tax revenue, % of GDP (World Bank, World Development Indicators GC.TAX.TOTL.GD.ZS)'],
+  wdi_trade: ['DV_SAMPLE_WDI_TRADE', 'data/sample-wdi_trade.js', 'Sample: Trade, % of GDP (World Bank, World Development Indicators NE.TRD.GNFS.ZS)'],
+  wdi_remit: ['DV_SAMPLE_WDI_REMIT', 'data/sample-wdi_remit.js', 'Sample: Personal remittances received, % of GDP (World Bank, World Development Indicators BX.TRF.PWKR.DT.GD.ZS)'],
+  wdi_gini: ['DV_SAMPLE_WDI_GINI', 'data/sample-wdi_gini.js', 'Sample: Gini index (World Bank, World Development Indicators SI.POV.GINI)'],
+  wdi_poverty: ['DV_SAMPLE_WDI_POVERTY', 'data/sample-wdi_poverty.js', 'Sample: Poverty headcount at $3.00 a day (2021 PPP), % of population (World Bank, World Development Indicators SI.POV.DDAY)'],
+  wdi_u5: ['DV_SAMPLE_WDI_U5', 'data/sample-wdi_u5.js', 'Sample: Under-5 mortality, per 1,000 live births (World Bank, World Development Indicators SH.DYN.MORT)'],
+  wdi_health: ['DV_SAMPLE_WDI_HEALTH', 'data/sample-wdi_health.js', 'Sample: Current health expenditure, % of GDP (World Bank, World Development Indicators SH.XPD.CHEX.GD.ZS)'],
+  wdi_age65: ['DV_SAMPLE_WDI_AGE65', 'data/sample-wdi_age65.js', 'Sample: Population aged 65 and over, % of population (World Bank, World Development Indicators SP.POP.65UP.TO.ZS)'],
+  wdi_urban: ['DV_SAMPLE_WDI_URBAN', 'data/sample-wdi_urban.js', 'Sample: Urban population, % of total (World Bank, World Development Indicators SP.URB.TOTL.IN.ZS)'],
+  wdi_internet: ['DV_SAMPLE_WDI_INTERNET', 'data/sample-wdi_internet.js', 'Sample: Individuals using the Internet, % of population (World Bank, World Development Indicators IT.NET.USER.ZS)'],
+  wdi_water: ['DV_SAMPLE_WDI_WATER', 'data/sample-wdi_water.js', 'Sample: Safely managed drinking water, % of population (World Bank, World Development Indicators SH.H2O.SMDW.ZS)'],
+  wdi_sanitation: ['DV_SAMPLE_WDI_SANITATION', 'data/sample-wdi_sanitation.js', 'Sample: Safely managed sanitation, % of population (World Bank, World Development Indicators SH.STA.SMSS.ZS)'],
+  wdi_secondary: ['DV_SAMPLE_WDI_SECONDARY', 'data/sample-wdi_secondary.js', 'Sample: Secondary school enrolment, % gross (World Bank, World Development Indicators SE.SEC.ENRR)'],
+  wdi_literacy: ['DV_SAMPLE_WDI_LITERACY', 'data/sample-wdi_literacy.js', 'Sample: Adult literacy rate, % of people aged 15 and over (World Bank, World Development Indicators SE.ADT.LITR.ZS)'],
+  wdi_female_lfp: ['DV_SAMPLE_WDI_FEMALE_LFP', 'data/sample-wdi_female_lfp.js', 'Sample: Female labour force participation, % of women aged 15 and over (modelled ILO estimate) (World Bank, World Development Indicators SL.TLF.CACT.FE.ZS)'],
+  wdi_rd: ['DV_SAMPLE_WDI_RD', 'data/sample-wdi_rd.js', 'Sample: Research and development expenditure, % of GDP (World Bank, World Development Indicators GB.XPD.RSDV.GD.ZS)'],
+  wdi_homicide: ['DV_SAMPLE_WDI_HOMICIDE', 'data/sample-wdi_homicide.js', 'Sample: Intentional homicides, per 100,000 people (World Bank, World Development Indicators VC.IHR.PSRC.P5)'],
+  wdi_forest: ['DV_SAMPLE_WDI_FOREST', 'data/sample-wdi_forest.js', 'Sample: Forest area, % of land area (World Bank, World Development Indicators AG.LND.FRST.ZS)'],
+  wdi_renewable: ['DV_SAMPLE_WDI_RENEWABLE', 'data/sample-wdi_renewable.js', 'Sample: Renewable energy, % of final energy consumption (World Bank, World Development Indicators EG.FEC.RNEW.ZS)'],
+  wdi_pm25: ['DV_SAMPLE_WDI_PM25', 'data/sample-wdi_pm25.js', 'Sample: PM2.5 air pollution, micrograms per cubic metre (World Bank, World Development Indicators EN.ATM.PM25.MC.M3)'],
+  wdi_co2_pc: ['DV_SAMPLE_WDI_CO2_PC', 'data/sample-wdi_co2_pc.js', 'Sample: CO2 emissions excluding land use, tonnes per capita (World Bank, World Development Indicators EN.GHG.CO2.PC.CE.AR5)'],
+  wdi_ghg: ['DV_SAMPLE_WDI_GHG', 'data/sample-wdi_ghg.js', 'Sample: Greenhouse gas emissions excluding land use, thousand tonnes CO2e (World Bank, World Development Indicators EN.GHG.ALL.MT.CE.AR5)'],
+  wdi_cwon_total: ['DV_SAMPLE_WDI_CWON_TOTAL', 'data/sample-wdi_cwon_total.js', 'Sample: Total wealth per capita, current US$ (World Bank, The Changing Wealth of Nations 2024, NW.TOW.PC.CD)'],
+  wdi_cwon_human: ['DV_SAMPLE_WDI_CWON_HUMAN', 'data/sample-wdi_cwon_human.js', 'Sample: Human capital wealth per capita, current US$ (World Bank, The Changing Wealth of Nations 2024, NW.HCA.PC.CD)'],
+  wdi_cwon_renew: ['DV_SAMPLE_WDI_CWON_RENEW', 'data/sample-wdi_cwon_renew.js', 'Sample: Renewable natural capital per capita, current US$ (World Bank, The Changing Wealth of Nations 2024, NW.NCA.TOTL.PC.CD)'],
+  wdi_cwon_nonrenew: ['DV_SAMPLE_WDI_CWON_NONRENEW', 'data/sample-wdi_cwon_nonrenew.js', 'Sample: Nonrenewable natural capital per capita, current US$ (World Bank, The Changing Wealth of Nations 2024, NW.NCA.SSOI.PC.CD)'],
+  hdi: ['DV_SAMPLE_HDI', 'data/sample-hdi.js', 'Sample: Human Development Index, 0 to 1 (UNDP, Human Development Report 2025, via Our World in Data)'],
+  electdem: ['DV_SAMPLE_ELECTDEM', 'data/sample-electdem.js', 'Sample: electoral democracy index, 0 to 1 (V-Dem v16, via Our World in Data)'],
+  regime: ['DV_SAMPLE_REGIME', 'data/sample-regime.js', 'Sample: political regime, Regimes of the World (V-Dem v16, via Our World in Data)']
 };
+function sampleSrc(k) {
+  var t;
+  if (k === 'world') t = 'Natural Earth, public domain.';
+  else if (k === 'hdi') t = 'UNDP, Human Development Report 2025, via Our World in Data. CC BY 3.0 IGO; reshaped.';
+  else if (k === 'electdem') t = 'V-Dem Country-Year Dataset v16 (2026), Coppedge et al., doi:10.23696/vdemds26, via Our World in Data. CC BY-SA 4.0; adapted, offered on the same terms.';
+  else if (k === 'regime') t = 'V-Dem Country-Year Dataset v16 (2026), Coppedge et al., doi:10.23696/vdemds26; Regimes of the World, Lührmann, Tannenberg and Lindberg (2018), Politics and Governance 6(1). CC BY-SA 4.0; adapted, offered on the same terms.';
+  else if (/^wdi_cwon/.test(k)) t = 'The World Bank: The Changing Wealth of Nations 2024. CC BY 4.0; reshaped.';
+  else if (/^wdi_/.test(k)) t = 'The World Bank: World Development Indicators. CC BY 4.0; reshaped.';
+  else t = 'Our World in Data, from the sources named. CC BY 4.0; reshaped.';
+  return { text: t, warn: false };
+}
 function loadSample(k, done) {
   var sm = SAMPLES[k];
   if (!sm) return;
-  function go() { loadText(window[sm[0]], sm[2]); if (done) done(); }
+  function go() { loadText(window[sm[0]], sm[2], sampleSrc(k)); if (done) done(); }
   if (window[sm[0]]) go(); else loadScript(sm[1], go);
 }
-document.getElementById('samplesel').addEventListener('change', function (e) { var k = e.target.value; e.target.value = ''; loadSample(k); });
+document.getElementById('samplesel').addEventListener('change', function (e) { var k = e.target.value; e.target.value = ''; if (k === 'wbsearch') wbOpen(); else loadSample(k); });
 document.getElementById('sheet').addEventListener('change', function (e) { loadSheet(e.target.value); });
 document.getElementById('hdr').addEventListener('change', function (e) { S.hdr = +e.target.value; readColumns(true); });
 document.getElementById('ccol').addEventListener('change', function (e) { S.ccol = +e.target.value; S.colour = S.colour.filter(function (c) { return c !== S.ccol; }); if (S.shade === S.ccol) S.shade = null; if (S.hatch === S.ccol) S.hatch = null; S.manual = {}; refresh(); });
@@ -1811,10 +2145,161 @@ window.addEventListener('dragleave', function () { dragDepth = Math.max(0, dragD
 window.addEventListener('dragover', function (e) { e.preventDefault(); });
 window.addEventListener('drop', function (e) { e.preventDefault(); dragDepth = 0; dropEl.classList.remove('on'); if (e.dataTransfer.files[0]) openFile(e.dataTransfer.files[0]); });
 
+/* ------------------------------------------------------------ World Bank indicator search */
+var WBAPI = 'https://api.worldbank.org/v2/', WB = { list: null, countries: null, busy: 0 };
+function wbGet(path) {
+  var ctl = typeof AbortController === 'function' ? new AbortController() : null, tm = setTimeout(function () { if (ctl) ctl.abort(); }, 45000);
+  return fetch(WBAPI + path, ctl ? { signal: ctl.signal } : {}).then(function (r) {
+    clearTimeout(tm);
+    if (!r.ok) throw new Error('The World Bank answered with an error (' + r.status + ').');
+    return r.json();
+  }, function (e) {
+    clearTimeout(tm);
+    throw new Error(e && e.name === 'AbortError' ? 'The World Bank took too long to answer.' : 'Could not reach the World Bank. Check your internet connection and try again.');
+  }).then(function (j) {
+    if (j && j[0] && j[0].message) throw new Error('The World Bank said: ' + (j[0].message[0] && j[0].message[0].value || 'no such data') + '.');
+    return j;
+  });
+}
+function wbShort(t) {
+  t = String(t || '').split('\n')[0].replace(/,?\s*(uri|publisher):.*$/i, '').replace(/\s+/g, ' ').replace(/[;,\s]+$/, '').trim();
+  return t.length > 80 ? t.slice(0, 77) + '…' : t;
+}
+function wbIndicators() {
+  if (WB.list) return Promise.resolve(WB.list);
+  try { var c = JSON.parse(sessionStorage.getItem('dv-wb-list') || 'null'); if (c && c.length > 500) { WB.list = c; return Promise.resolve(c); } } catch (e) {}
+  return wbGet('sources/2/indicators?format=json&per_page=3000').then(function (j) {
+    var rows = (j && j[1]) || [];
+    if (!rows.length) throw new Error('The World Bank sent no list of indicators.');
+    WB.list = rows.map(function (x) { return [x.id, x.name, wbShort(x.sourceOrganization), x.unit || '']; });
+    try { sessionStorage.setItem('dv-wb-list', JSON.stringify(WB.list)); } catch (e) {}
+    return WB.list;
+  });
+}
+function wbCountries() {
+  if (WB.countries) return Promise.resolve(WB.countries);
+  return wbGet('country?format=json&per_page=400').then(function (j) {
+    var m = {};
+    ((j && j[1]) || []).forEach(function (c) { if (c.region && c.region.id !== 'NA') m[c.id] = c.name; });
+    if (Object.keys(m).length < 100) throw new Error('The World Bank sent an incomplete list of countries.');
+    return (WB.countries = m);
+  });
+}
+function wbStatus(html, busy) {
+  document.getElementById('wbstat').innerHTML = (busy ? '<span class="spin"></span>' : '') + html;
+  document.getElementById('wbbox').classList.toggle('busy', !!busy);
+}
+function wbOpen() {
+  var d = document.getElementById('wbdlg'), q = document.getElementById('wbq');
+  d.classList.add('on'); q.value = ''; document.getElementById('wbres').innerHTML = '';
+  wbStatus('Loading the list of indicators…', true);
+  setTimeout(function () { try { q.focus(); } catch (e) {} }, 30);
+  wbIndicators().then(function () { wbStatus('Type to search.'); wbSearch(); }, function (e) { wbStatus(esc(e.message)); });
+}
+function wbClose() { document.getElementById('wbdlg').classList.remove('on'); WB.busy++; }
+function wbSearch() {
+  var q = document.getElementById('wbq').value.trim().toLowerCase(), box = document.getElementById('wbres');
+  if (!WB.list) return;
+  if (!q) { box.innerHTML = ''; wbStatus('Type to search.'); return; }
+  var words = q.split(/\s+/);
+  var hits = [];
+  WB.list.forEach(function (x) {
+    var nm = x[1].toLowerCase(), id = x[0].toLowerCase(), sc = 0;
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      if (id === w) sc += 6; else if (id.indexOf(w) >= 0) sc += 3;
+      else if (new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(nm)) sc += 2;
+      else if (nm.indexOf(w) >= 0) sc += 1;
+      else return;
+    }
+    if (words.length > 1 && nm.indexOf(q) >= 0) sc += 3;
+    if (nm.indexOf(q) === 0) sc += 2;
+    hits.push([sc - nm.length / 400, x]);
+  });
+  hits.sort(function (a, b) { return b[0] - a[0]; });
+  if (!hits.length) { box.innerHTML = ''; wbStatus('No indicator matches “' + esc(q) + '”. Try fewer or different words.'); return; }
+  var shown = hits.slice(0, 40);
+  wbStatus(hits.length + (hits.length === 1 ? ' indicator' : ' indicators') + (hits.length > shown.length ? ', best 40 shown' : '') + '. Choose one to map it.');
+  box.innerHTML = shown.map(function (h, i) {
+    return '<button type="button" data-code="' + esc(h[1][0]) + '"><div class="n">' + esc(h[1][1]) + '</div><div class="c">' + esc(h[1][0]) + (h[1][2] ? ' · ' + esc(h[1][2]) : '') + '</div></button>';
+  }).join('');
+}
+/* the metadata API sends no CORS headers, so the licences come from data/wdi-licences.js (build_wdi_licences.py) */
+function wbLicence(code) {
+  function look() {
+    var L = window.DV_WDI_LIC;
+    if (!L) return { type: '', url: '', failed: true };
+    if (L.other[code]) return { type: L.other[code][0], url: L.other[code][1], checked: true };
+    if ((',' + L.cc + ',').indexOf(',' + code + ',') >= 0) return { type: 'CC BY 4.0', url: 'https://datacatalog.worldbank.org/public-licenses#cc-by', checked: true };
+    return { type: '', url: '', failed: true };
+  }
+  if (window.DV_WDI_LIC) return Promise.resolve(look());
+  return new Promise(function (res) {
+    var el = document.createElement('script');
+    el.src = 'data/wdi-licences.js';
+    el.onload = function () { res(look()); }; el.onerror = function () { res(look()); };
+    document.head.appendChild(el);
+  });
+}
+function wbData(code, page, acc) {
+  return wbGet('country/all/indicator/' + encodeURIComponent(code) + '?format=json&per_page=20000&date=1960:2026&page=' + page).then(function (j) {
+    var rows = (j && j[1]) || [], pages = (j && j[0] && j[0].pages) || 1;
+    acc.push.apply(acc, rows);
+    return page < pages && page < 10 ? wbData(code, page + 1, acc) : acc;
+  });
+}
+function csvCell(t) { t = String(t); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }
+function wbLoad(code) {
+  var ind = null;
+  WB.list.forEach(function (x) { if (x[0] === code) ind = x; });
+  if (!ind) return;
+  var my = ++WB.busy, name = ind[1];
+  wbStatus('Fetching “' + esc(name) + '” for every country…', true);
+  Promise.all([wbCountries(), wbData(code, 1, []), wbLicence(code)]).then(function (r) {
+    if (my !== WB.busy) return;
+    var cs = r[0], rows = r[1], lic = r[2], by = {}, yrs = {};
+    rows.forEach(function (x) {
+      if (x.value == null || !cs[x.countryiso3code]) return;
+      var iso = x.countryiso3code, key = iso;
+      if (!by[key]) by[key] = { name: cs[iso], iso: iso, v: {} };
+      by[key].v[x.date] = x.value; yrs[x.date] = 1;
+    });
+    var years = Object.keys(yrs).map(Number).sort(function (a, b) { return a - b; }), keys = Object.keys(by);
+    if (!keys.length) { wbStatus('The World Bank has no country figures for ' + esc(code) + '. Choose another indicator.'); return; }
+    var lines = ['Country,ISO3,' + years.join(',')];
+    keys.sort(function (a, b) { return by[a].name.localeCompare(by[b].name); }).forEach(function (k) {
+      var c = by[k];
+      lines.push(csvCell(c.name) + ',' + c.iso + ',' + years.map(function (y) { var v = c.v[y]; return v == null ? '' : v; }).join(','));
+    });
+    var cc = lic.type === 'CC BY 4.0';
+    var text = 'The World Bank: World Development Indicators, ' + name + ' (' + code + '). ' +
+      (lic.failed ? 'Licence not checked: see https://data.worldbank.org/indicator/' + code + '. ' : 'Licence: ' + (lic.type || 'not stated') + (lic.url && !cc ? ' (' + lic.url + ')' : '') + '. ') +
+      (cc ? 'Reshaped here.' : 'Not CC BY 4.0: shown in your browser only; check these terms before republishing.') +
+      (keys.length < 40 ? ' Only ' + keys.length + ' countries have figures.' : '');
+    var src = { text: text, warn: !cc };
+    wbClose();
+    loadText(lines.join('\n'), 'World Bank: ' + name + ' (' + code + ')', src);
+  }, function (e) {
+    if (my !== WB.busy) return;
+    wbStatus(esc(e.message));
+  });
+}
+document.getElementById('wbq').addEventListener('input', wbSearch);
+document.getElementById('wbq').addEventListener('keydown', function (e) { if (e.key === 'Enter') { var b = document.querySelector('#wbres button'); if (b) b.click(); } });
+document.getElementById('wbres').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) wbLoad(b.getAttribute('data-code')); });
+document.getElementById('wbx').addEventListener('click', wbClose);
+document.getElementById('wbdlg').addEventListener('click', function (e) { if (e.target === this) wbClose(); });
+window.addEventListener('keydown', function (e) { if (e.key === 'Escape' && document.getElementById('wbdlg').classList.contains('on')) { wbClose(); e.stopPropagation(); } }, true);
+
 /* ------------------------------------------------------------ turning the view */
 var fly = null;
 function flyTo(rot, z) {
   spin = null;
+  if (VIEW.flat) {
+    fly = { flat: true, a: [flon, fLat], b: [-rot[0], -rot[1]], za: fz, zb: z ? Math.max(1, z) : fz, t0: performance.now(), d: 900 };
+    if (fly.b[0] - fly.a[0] > 180) fly.b[0] -= 360; else if (fly.a[0] - fly.b[0] > 180) fly.b[0] += 360;
+    scheduleDraw(); return;
+  }
   fly = { a: rotation.slice(), b: rot, za: zoom, zb: z || zoom, t0: performance.now(), d: 900 };
   if (fly.b[0] - fly.a[0] > 180) fly.b[0] -= 360; else if (fly.a[0] - fly.b[0] > 180) fly.b[0] += 360;
   scheduleDraw();
@@ -1822,34 +2307,47 @@ function flyTo(rot, z) {
 function stepFly(now) {
   if (!fly) return false;
   var u = clamp((now - fly.t0) / fly.d, 0, 1), e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
-  rotation = [fly.a[0] + (fly.b[0] - fly.a[0]) * e, fly.a[1] + (fly.b[1] - fly.a[1]) * e];
-  zoom = fly.za + (fly.zb - fly.za) * e;
+  if (fly.flat) {
+    flon = wrapLon(fly.a[0] + (fly.b[0] - fly.a[0]) * e); fLat = fly.a[1] + (fly.b[1] - fly.a[1]) * e;
+    fz = fly.za + (fly.zb - fly.za) * e;
+  } else {
+    rotation = [fly.a[0] + (fly.b[0] - fly.a[0]) * e, fly.a[1] + (fly.b[1] - fly.a[1]) * e];
+    zoom = fly.za + (fly.zb - fly.za) * e;
+  }
   if (u >= 1) { fly = null; updateHash(); return false; }
   return true;
 }
 var drag = null, pinch = null, pointers = {}, moved = 0;
+function midOf(a, b) { return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; }
 cv.addEventListener('pointerdown', function (e) {
+  if (!inWin(e.clientX, e.clientY)) return;
   pointers[e.pointerId] = [e.clientX, e.clientY];
   cv.setPointerCapture(e.pointerId);
   var ids = Object.keys(pointers);
-  if (ids.length === 2) { var a = pointers[ids[0]], b = pointers[ids[1]]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: zoom }; drag = null; }
-  else { drag = { x: e.clientX, y: e.clientY, rot: rotation.slice() }; fly = null; spin = null; moved = 0; trail = [[performance.now(), e.clientX, e.clientY]]; }
+  if (ids.length === 2) {
+    var a = pointers[ids[0]], b = pointers[ids[1]], m = midOf(a, b);
+    autoFill = false; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: VIEW.flat ? fz : zoom, P: VIEW.flat ? pxToLL(m[0], m[1]) : null }; drag = null;
+  }
+  else { autoFill = false; drag = { x: e.clientX, y: e.clientY, rot: rotation.slice(), P: VIEW.flat ? pxToLL(e.clientX, e.clientY) : null }; fly = null; spin = null; moved = 0; trail = [[performance.now(), e.clientX, e.clientY]]; }
   cv.classList.add('dragging'); hideTip();
 });
 cv.addEventListener('pointermove', function (e) {
   if (pointers[e.pointerId]) pointers[e.pointerId] = [e.clientX, e.clientY];
   if (pinch) {
     var ids = Object.keys(pointers); if (ids.length < 2) return;
-    var a = pointers[ids[0]], b = pointers[ids[1]];
-    zoom = clamp(pinch.z * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d, 0.8, 12); scheduleDraw(); return;
+    var a = pointers[ids[0]], b = pointers[ids[1]], ratio = Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d;
+    if (VIEW.flat) { var m = midOf(a, b); fz = clamp(pinch.z * ratio, 1, FZMAX); anchor(pinch.P, m[0], m[1]); updateHash(); }
+    else zoom = clamp(pinch.z * ratio, 0.8, 12);
+    scheduleDraw(); return;
   }
   if (drag) {
-    var k = 0.25 / zoom;
     moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
     trail.push([performance.now(), e.clientX, e.clientY]); if (trail.length > 8) trail.shift();
-    rotation = [drag.rot[0] + (e.clientX - drag.x) * k, clamp(drag.rot[1] - (e.clientY - drag.y) * k, -90, 90)];
+    if (VIEW.flat) anchor(drag.P, e.clientX, e.clientY);
+    else { var k = 0.25 / zoom; rotation = [drag.rot[0] + (e.clientX - drag.x) * k, clamp(drag.rot[1] - (e.clientY - drag.y) * k, -90, 90)]; }
     updateHash(); scheduleDraw(); return;
   }
+  if (!inWin(e.clientX, e.clientY)) { if (hoverItem != null) { hoverItem = null; scheduleDraw(); } hideTip(); return; }
   hover(e.clientX, e.clientY);
 });
 function endPointer(e) {
@@ -1860,9 +2358,14 @@ function endPointer(e) {
     else if (drag) {
       var now = performance.now(), recent = trail.filter(function (p) { return now - p[0] < 90; });
       if (recent.length > 1) {
-        var a = recent[0], b = recent[recent.length - 1], dt = Math.max(8, b[0] - a[0]), kk = 0.25 / zoom;
-        var vl = (b[1] - a[1]) / dt * kk, vp = -(b[2] - a[2]) / dt * kk, sp = Math.hypot(vl, vp);
-        if (sp > 0.01) { if (sp > 1.2) { vl *= 1.2 / sp; vp *= 1.2 / sp; } spin = { vl: vl, vp: vp, last: now }; scheduleDraw(); }
+        var a = recent[0], b = recent[recent.length - 1], dt = Math.max(8, b[0] - a[0]);
+        if (VIEW.flat) {
+          var vx = (b[1] - a[1]) / dt, vy = (b[2] - a[2]) / dt, sp = Math.hypot(vx, vy);
+          if (sp > 0.03) { if (sp > 2) { vx *= 2 / sp; vy *= 2 / sp; } spin = { vx: vx, vy: vy, last: now }; scheduleDraw(); }
+        } else {
+          var kk = 0.25 / zoom, vl = (b[1] - a[1]) / dt * kk, vp = -(b[2] - a[2]) / dt * kk, sp2 = Math.hypot(vl, vp);
+          if (sp2 > 0.01) { if (sp2 > 1.2) { vl *= 1.2 / sp2; vp *= 1.2 / sp2; } spin = { vl: vl, vp: vp, last: now }; scheduleDraw(); }
+        }
       }
     }
     drag = null; cv.classList.remove('dragging');
@@ -1870,7 +2373,16 @@ function endPointer(e) {
 }
 cv.addEventListener('pointerup', endPointer); cv.addEventListener('pointercancel', endPointer);
 cv.addEventListener('pointerleave', function () { if (!drag) { hideTip(); if (hoverItem != null) { hoverItem = null; scheduleDraw(); } } });
-cv.addEventListener('wheel', function (e) { e.preventDefault(); zoom = clamp(zoom * Math.exp(-e.deltaY * 0.0015), 0.8, 12); updateHash(); scheduleDraw(); }, { passive: false });
+var FZMAX = 60;
+cv.addEventListener('wheel', function (e) {
+  e.preventDefault();
+  if (!inWin(e.clientX, e.clientY)) return;
+  if (VIEW.flat) {
+    autoFill = false; var P = pxToLL(e.clientX, e.clientY);
+    fz = clamp(fz * Math.exp(-e.deltaY * 0.0015), 1, FZMAX); anchor(P, e.clientX, e.clientY);
+  } else zoom = clamp(zoom * Math.exp(-e.deltaY * 0.0015), 0.8, 12);
+  updateHash(); scheduleDraw();
+}, { passive: false });
 
 function inRings(it, ll) {
   var b = it.box;
@@ -1880,15 +2392,20 @@ function inRings(it, ll) {
   return n % 2 === 1;
 }
 function itemAt(x, y) {
-  if (Math.hypot(x - CX, y - CY) > R0 * zoom) return null;
-  if (zoom < 5) for (var j = 0; j < ITEMS.length; j++) {
+  if (!inWin(x, y)) return null;
+  if (!VIEW.flat && Math.hypot(x - CX, y - CY) > R0 * zoom) return null;
+  if (dotsOn()) for (var j = 0; j < ITEMS.length; j++) {
     var s = ITEMS[j];
-    if (!s.small || OWNER[j] !== j || s.labV[0] * viewV[0] + s.labV[1] * viewV[1] + s.labV[2] * viewV[2] < 0.05) continue;
+    if (!s.small || OWNER[j] !== j || !dotFacing(s)) continue;
     var p = projection(s.lab);
     if (p && Math.hypot(p[0] - x, p[1] - y) < 6) return j;
   }
   var ll = projection.invert([x, y]);
   if (!ll) return null;
+  if (VIEW.flat) {
+    var q = projection(ll);
+    if (!q || Math.hypot(q[0] - x, q[1] - y) > 2 || Math.abs(ll[1]) > (VIEW.proj === 'merc' ? MAXLAT : 90)) return null;
+  }
   for (var i = 0; i < ITEMS.length; i++) if (inRings(ITEMS[i], ll)) return i;
   return null;
 }
@@ -1909,29 +2426,84 @@ function hideTip() { tipEl.style.display = 'none'; }
 var hashTimer = 0;
 function updateHash() {
   clearTimeout(hashTimer);
-  hashTimer = setTimeout(function () { history.replaceState(null, '', '#v=' + rotation.map(function (x) { return x.toFixed(1); }).join(',') + '&z=' + zoom.toFixed(2)); }, 300);
+  hashTimer = setTimeout(function () {
+    var h = VIEW.flat ? '#m=flat' + (projExplicit ? '&p=' + VIEW.proj : '') + '&c=' + flon.toFixed(1) + ',' + fLat.toFixed(1) + '&fz=' + fz.toFixed(2)
+      : '#v=' + rotation.map(function (x) { return x.toFixed(1); }).join(',') + '&z=' + zoom.toFixed(2);
+    history.replaceState(null, '', h);
+  }, 300);
 }
+var hashFlatView = false;
 (function readHash() {
   var h = {}; location.hash.slice(1).split('&').forEach(function (kv) { var p = kv.split('='); if (p[1]) h[p[0]] = decodeURIComponent(p[1]); });
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem('dv-view') || '{}'); } catch (e) {}
+  VIEW.proj = defaultProj();
+  if (saved.pv === 4 && (saved.proj === 'cea' || saved.proj === 'eq' || saved.proj === 'merc')) { VIEW.proj = saved.proj; projExplicit = true; }
+  if (h.m || h.v) VIEW.flat = h.m === 'flat'; else VIEW.flat = !!saved.flat;
+  if (h.p === 'cea' || h.p === 'eq' || h.p === 'merc') { VIEW.proj = h.p; projExplicit = true; }
   if (h.v) { var v = h.v.split(',').map(Number); if (v.length === 2 && !isNaN(v[0])) rotation = v; }
   if (h.z && !isNaN(+h.z)) zoom = clamp(+h.z, 0.8, 12);
+  if (h.c) { var c = h.c.split(',').map(Number); if (c.length === 2 && !isNaN(c[0]) && !isNaN(c[1])) { flon = wrapLon(c[0]); fLat = c[1]; hashFlatView = true; autoFill = false; } }
+  if (h.fz && !isNaN(+h.fz)) { fz = clamp(+h.fz, 1, FZMAX); hashFlatView = true; autoFill = false; }
+  if (VIEW.proj === 'merc' && !hashFlatView) fLat = 0;
 })();
+function syncViewUI() {
+  document.body.classList.toggle('flat', VIEW.flat);
+  document.querySelectorAll('#vmode [data-mode]').forEach(function (b) { b.classList.toggle('on', (b.dataset.mode === 'flat') === VIEW.flat); });
+  document.getElementById('vproj').value = VIEW.proj;
+  glCv.style.visibility = VIEW.flat && !GL ? 'hidden' : '';
+  if (!VIEW.flat) glCv.style.clipPath = '';
+}
+/* Globe or flat map, and equal area (rectangular), Equal Earth or Mercator; the globe's view and the flat map's are kept apart but start from each other */
+function setMode(flat, proj) {
+  var was = VIEW.flat;
+  if (proj === 'cea' || proj === 'eq' || proj === 'merc') { VIEW.proj = proj; projExplicit = true; }
+  if (flat != null) VIEW.flat = !!flat;
+  fly = spin = drag = pinch = null; pointers = {}; hideTip();
+  if (VIEW.flat && !was) {
+    flon = wrapLon(-rotation[0]); fLat = clamp(-rotation[1], -60, 75);
+    autoFill = true; fz = 1;
+  } else if (!VIEW.flat && was) rotation = [-flon, clamp(-fLat, -90, 90)];
+  try { localStorage.setItem('dv-view', JSON.stringify(projExplicit ? { flat: VIEW.flat, proj: VIEW.proj, pv: 4 } : { flat: VIEW.flat, pv: 4 })); } catch (e) {}
+  if (VIEW.flat && VIEW.proj === 'merc' && fz <= 1.0001) fLat = 0;
+  syncViewUI(); hoverItem = null; resize(); updateHash();
+}
+document.querySelectorAll('#vmode [data-mode]').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode === 'flat'); }); });
+document.getElementById('vproj').addEventListener('change', function () { setMode(true, this.value); });
 
 /* the side panels, put away and brought back one by one; remembered in this browser */
-var FOLD = { data: false, legend: false };
-try { var fs = JSON.parse(localStorage.getItem('dv-fold') || '{}'); FOLD.data = !!fs.data; FOLD.legend = !!fs.legend; } catch (e) {}
+/* Each way of looking keeps its own choices: g wide globe, f wide flat map, p phone-width (globe or flat). null means "the default":
+   open, except on phones and where the flat map would have under FLATMIN px with both panels open (PANELS_W), when
+   the panels start put away as pills. Once the user opens or puts one away, that is kept. */
+var FOLDS = { g: {}, f: {}, p: {} }, FOLD = { data: false, legend: false }, FLATMIN = 700;
+try {
+  var fs = JSON.parse(localStorage.getItem('dv-fold') || '{}');
+  if (fs.v === 3) ['g', 'f', 'p'].forEach(function (m) { ['data', 'legend'].forEach(function (k) { if (fs[m] && typeof fs[m][k] === 'boolean') FOLDS[m][k] = fs[m][k]; }); });
+  else ['data', 'legend'].forEach(function (k) { if (typeof fs[k] === 'boolean') FOLDS.g[k] = fs[k]; });
+} catch (e) {}
+function foldMode() { return narrow ? 'p' : VIEW.flat ? 'f' : 'g'; }
+function foldDefault(m) { return m === 'p' || (m === 'f' && W - PANELS_W < FLATMIN); }
+function syncFold() {
+  var m = foldMode();
+  ['data', 'legend'].forEach(function (k) {
+    FOLD[k] = typeof FOLDS[m][k] === 'boolean' ? FOLDS[m][k] : foldDefault(m);
+    document.body.classList.toggle('fold-' + k, FOLD[k]);
+  });
+}
 function setFold(k, v) {
-  FOLD[k] = v;
-  document.body.classList.toggle('fold-' + k, v);
-  try { localStorage.setItem('dv-fold', JSON.stringify(FOLD)); } catch (e) {}
-  resize();
+  FOLDS[foldMode()][k] = v;
+  try { localStorage.setItem('dv-fold', JSON.stringify({ v: 3, g: FOLDS.g, f: FOLDS.f, p: FOLDS.p })); } catch (e) {}
+  relayout(true);
 }
 document.querySelectorAll('[data-fold]').forEach(function (b) { b.addEventListener('click', function () { setFold(b.dataset.fold, true); }); });
 document.querySelectorAll('[data-unfold]').forEach(function (b) { b.addEventListener('click', function () { setFold(b.dataset.unfold, false); }); });
-['data', 'legend'].forEach(function (k) { document.body.classList.toggle('fold-' + k, FOLD[k]); });
+if (window.ResizeObserver) {
+  var roPend = false, ro = new ResizeObserver(function () { if (!roPend) { roPend = true; requestAnimationFrame(function () { roPend = false; relayout(true); }); } });
+  ['data', 'legend', 'card', 'frames', 'viewbar'].forEach(function (id) { ro.observe(document.getElementById(id)); });
+}
 
 window.addEventListener('resize', resize);
-computeLooks(); renderLegend(); resize();
+syncViewUI(); computeLooks(); renderLegend(); resize();
 
 window.DV = {
   loadText: loadText, sample: function (k, done) { loadSample(k || 'world', done); }, popReady: function () { return !!POP; },
@@ -1941,7 +2513,8 @@ window.DV = {
   setFrame: setFrame, frames: function () { return S.frames.map(function (F) { return [F.label, F.t]; }); }, period: function (v, fy) { return periodAt(parsePeriod(v, fy), (parsePeriod(v, fy) || {}).g); },
   spinning: function () { return !!spin; }, fold: setFold, centre: function () { return [CX, CY, R0]; }, match: function (s) { var i = matchCell(s, true); return i == null ? null : ITEMS[i].name; },
   look: function (iso3) { var it = ITEMS.filter(function (x) { return x.iso3 === iso3; })[0]; return it ? LOOK[it.idx] : null; },
-  setView: function (lon, lat, z) { fly = null; rotation = [-lon, -lat]; if (z) zoom = z; scheduleDraw(); },
+  setView: function (lon, lat, z) { fly = null; if (VIEW.flat) { autoFill = false; flon = wrapLon(lon); fLat = lat; if (z) fz = clamp(z, 1, FZMAX); } else { rotation = [-lon, -lat]; if (z) zoom = z; } scheduleDraw(); },
+  win: function () { applyProjection(); return winRect(); }, mode: setMode, view: function () { return { flat: VIEW.flat, proj: VIEW.proj, lon: flon, lat: fLat, fz: fz, hash: location.hash }; }, flatScale: function () { applyProjection(); return VIEW.flat ? projection.scale() : null; },
   project: function (ll) { applyProjection(); return projection(ll); },
   drawMs: function () { draw(); return lastDrawMs; }, renderer: function () { return GL ? GL.renderer() : '2d'; },
   pin: function (iso3, add) { var it = ITEMS.filter(function (x) { return x.iso3 === iso3; })[0]; select(it ? OWNER[it.idx] : null, add); },
